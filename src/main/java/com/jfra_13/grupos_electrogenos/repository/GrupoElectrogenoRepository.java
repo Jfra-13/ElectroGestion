@@ -16,7 +16,9 @@ public interface GrupoElectrogenoRepository extends JpaRepository<GrupoElectroge
 
     // RF04: Listar por combustible, ordenado por potencia máxima descendente
     // Spring Boot lee el nombre del método y arma el SQL "SELECT * WHERE tipoCombustible = ? ORDER BY pMax DESC"
-    List<GrupoElectrogeno> findByTipoCombustibleOrderByPMaxDesc(TipoCombustible tipoCombustible);
+    // Le decimos a Spring la consulta exacta para que no se confunda con las mayúsculas de pMax
+    @Query("SELECT g FROM GrupoElectrogeno g WHERE g.tipoCombustible = :tipoCombustible ORDER BY g.pMax DESC")
+    List<GrupoElectrogeno> findByTipoCombustibleOrderByPMaxDesc(@Param("tipoCombustible") TipoCombustible tipoCombustible);
 
     // RF07: Listar móviles automáticos según el material del eje
     // Como GrupoElectrogenoMovil hereda de GrupoElectrogeno, usamos JPQL para buscar específicamente en la clase hija
