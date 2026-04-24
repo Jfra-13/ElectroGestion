@@ -38,4 +38,9 @@ public class SolicitudCompra {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entidad_id", nullable = false)
     private Entidad entidad;
+
+    // Relación: Una solicitud vende un modelo específico de Grupo Electrógeno
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "grupo_id", nullable = false)
+    private GrupoElectrogeno grupoElectrogeno;
 }
