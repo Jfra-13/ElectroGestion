@@ -4,9 +4,13 @@ import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogenoMovil;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
+import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 import com.jfra_13.grupos_electrogenos.repository.GrupoElectrogenoRepository;
 import com.jfra_13.grupos_electrogenos.service.GrupoElectrogenoService;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
@@ -59,5 +63,25 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
         }
 
         return precio;
+    }
+
+    @Override
+    public List<GrupoElectrogeno> buscarPorCombustible(TipoCombustible combustible) {
+        return repository.findByTipoCombustibleOrderByPMaxDesc(combustible);
+    }
+
+    @Override
+    public List<com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO> buscarMovilesPorEje(MaterialEje material) {
+        List<GrupoElectrogenoMovil> moviles = repository.buscarMovilesAutomaticosPorEje(material);
+
+        // El requerimiento RF07 pide devolver SOLO código y vida útil.
+        // Mapeamos las entidades al DTO usando el patrón Builder que configuramos con Lombok.
+        return moviles.stream().map(movil ->
+                com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO.builder()
+                        .codigo(movil.getCodigo())
+                        .vidaUtil(movil.getVidaUtil())
+                        // Omitimos el resto de datos para cumplir con el filtro estricto
+                        .build()
+        ).collect(Collectors.toList());
     }
 }
