@@ -1,4 +1,5 @@
 package com.jfra_13.grupos_electrogenos.model.enums;
 
-public class TipoArranque {
+public enum TipoArranque {
+    AUTOMATICO, MANUAL
 }
