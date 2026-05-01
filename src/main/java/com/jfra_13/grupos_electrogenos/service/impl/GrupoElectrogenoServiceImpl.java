@@ -1,5 +1,6 @@
 package com.jfra_13.grupos_electrogenos.service.impl;
 
+import com.jfra_13.grupos_electrogenos.exception.ResourceNotFoundException;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogenoMovil;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
@@ -25,6 +26,40 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
     @Override
     public GrupoElectrogeno guardarGrupo(GrupoElectrogeno grupo) {
         return repository.save(grupo);
+    }
+
+    @Override
+    public GrupoElectrogeno obtenerPorId(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo Electrógeno no encontrado con ID: " + id));
+    }
+
+    @Override
+    public GrupoElectrogeno actualizarGrupo(Long id, GrupoElectrogeno grupoDetails) {
+        GrupoElectrogeno existing = obtenerPorId(id);
+
+        existing.setCodigo(grupoDetails.getCodigo());
+        existing.setVidaUtil(grupoDetails.getVidaUtil());
+        existing.setTipoCombustible(grupoDetails.getTipoCombustible());
+        existing.setTipoArranque(grupoDetails.getTipoArranque());
+        existing.setPMin(grupoDetails.getPMin());
+        existing.setPMax(grupoDetails.getPMax());
+        existing.setInsonorizado(grupoDetails.getInsonorizado());
+        existing.setCapo(grupoDetails.getCapo());
+
+        // Manejo de campos específicos si es móvil
+        if (existing instanceof GrupoElectrogenoMovil movilExistente && grupoDetails instanceof GrupoElectrogenoMovil movilNuevo) {
+            movilExistente.setCantidadRuedas(movilNuevo.getCantidadRuedas());
+            movilExistente.setMaterialEje(movilNuevo.getMaterialEje());
+        }
+
+        return repository.save(existing);
+    }
+
+    @Override
+    public void eliminarGrupo(Long id) {
+        GrupoElectrogeno existing = obtenerPorId(id);
+        repository.delete(existing);
     }
 
     @Override

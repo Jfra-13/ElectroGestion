@@ -12,6 +12,12 @@ public interface GrupoElectrogenoService {
 
     // Método para guardar usando el repositorio
     GrupoElectrogeno guardarGrupo(GrupoElectrogeno grupo);
+
+    // Métodos CRUD básicos para RF01
+    GrupoElectrogeno obtenerPorId(Long id);
+    GrupoElectrogeno actualizarGrupo(Long id, GrupoElectrogeno grupo);
+    void eliminarGrupo(Long id);
+
     // Nuevos métodos para el Sprint 4
     List<GrupoElectrogeno> buscarPorCombustible(TipoCombustible combustible);
 

@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,5 +55,20 @@ class GrupoElectrogenoControllerTest {
                 .andExpect(status().isCreated()) // Esperamos HTTP 201
                 .andExpect(jsonPath("$.id").value(1)) // Validamos que el JSON de respuesta tenga el ID 1
                 .andExpect(jsonPath("$.codigo").value("FJO-001"));
+    }
+
+    @Test
+    @DisplayName("Debe retornar el precio calculado correctamente")
+    void testCotizarPrecio() throws Exception {
+        // Arrange
+        GrupoElectrogeno grupoMock = new GrupoElectrogeno();
+        grupoMock.setId(1L);
+        when(service.obtenerPorId(1L)).thenReturn(grupoMock);
+        when(service.calcularPrecioVenta(grupoMock)).thenReturn(1500.0);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/grupos-electrogenos/1/precio"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(1500.0));
     }
 }
