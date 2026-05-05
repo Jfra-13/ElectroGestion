@@ -1,7 +1,8 @@
 package com.jfra_13.grupos_electrogenos.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoRequestDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 import com.jfra_13.grupos_electrogenos.service.GrupoElectrogenoService;
@@ -14,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -27,33 +29,44 @@ class GrupoElectrogenoControllerTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private GrupoElectrogenoService service; // Simulamos la capa de servicio
+    private GrupoElectrogenoService service;
 
     @Autowired
-    private ObjectMapper objectMapper; // Para convertir objetos a JSON
+    private ObjectMapper objectMapper;
 
     @Test
     @DisplayName("Debe retornar 201 CREATED al guardar un grupo electrógeno exitosamente")
     void testCrearGrupo() throws Exception {
-        // Arrange: Preparamos la data simulada
-        GrupoElectrogeno grupoMock = new GrupoElectrogeno();
-        grupoMock.setId(1L);
-        grupoMock.setCodigo("FJO-001");
-        grupoMock.setVidaUtil(10);
-        grupoMock.setTipoCombustible(TipoCombustible.GASOIL);
-        grupoMock.setTipoArranque(TipoArranque.AUTOMATICO);
-        grupoMock.setPMin(100.0);
-        grupoMock.setPMax(200.0);
+        // Arrange
+        GrupoElectrogenoRequestDTO requestDTO = GrupoElectrogenoRequestDTO.builder()
+                .codigo("FJO-001")
+                .vidaUtil(10)
+                .tipoCombustible(TipoCombustible.GASOIL)
+                .tipoArranque(TipoArranque.AUTOMATICO)
+                .pMin(100.0)
+                .pMax(200.0)
+                .esMovil(false)
+                .build();
 
-        // Le decimos a Mockito: "Cuando el controlador llame a guardarGrupo, devuelve grupoMock"
-        when(service.guardarGrupo(any(GrupoElectrogeno.class))).thenReturn(grupoMock);
+        GrupoElectrogenoResponseDTO responseDTO = GrupoElectrogenoResponseDTO.builder()
+                .id(1L)
+                .codigo("FJO-001")
+                .vidaUtil(10)
+                .tipoCombustible(TipoCombustible.GASOIL)
+                .tipoArranque(TipoArranque.AUTOMATICO)
+                .pMin(100.0)
+                .pMax(200.0)
+                .precioVentaCalculado(1500.0)
+                .build();
 
-        // Act & Assert: Simulamos la llamada HTTP y verificamos la respuesta
+        when(service.guardarGrupo(any(GrupoElectrogenoRequestDTO.class))).thenReturn(responseDTO);
+
+        // Act & Assert
         mockMvc.perform(post("/api/v1/grupos-electrogenos")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(grupoMock)))
-                .andExpect(status().isCreated()) // Esperamos HTTP 201
-                .andExpect(jsonPath("$.id").value(1)) // Validamos que el JSON de respuesta tenga el ID 1
+                        .content(objectMapper.writeValueAsString(requestDTO)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.codigo").value("FJO-001"));
     }
 
@@ -61,10 +74,11 @@ class GrupoElectrogenoControllerTest {
     @DisplayName("Debe retornar el precio calculado correctamente")
     void testCotizarPrecio() throws Exception {
         // Arrange
-        GrupoElectrogeno grupoMock = new GrupoElectrogeno();
-        grupoMock.setId(1L);
-        when(service.obtenerPorId(1L)).thenReturn(grupoMock);
-        when(service.calcularPrecioVenta(grupoMock)).thenReturn(1500.0);
+        GrupoElectrogenoResponseDTO responseDTO = GrupoElectrogenoResponseDTO.builder()
+                .id(1L)
+                .precioVentaCalculado(1500.0)
+                .build();
+        when(service.obtenerPorId(1L)).thenReturn(responseDTO);
 
         // Act & Assert
         mockMvc.perform(get("/api/v1/grupos-electrogenos/1/precio"))

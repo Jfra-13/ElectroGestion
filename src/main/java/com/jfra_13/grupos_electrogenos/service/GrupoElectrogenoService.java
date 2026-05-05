@@ -1,6 +1,7 @@
 package com.jfra_13.grupos_electrogenos.service;
 
-import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoRequestDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 
@@ -8,19 +9,19 @@ import java.util.List;
 
 public interface GrupoElectrogenoService {
     // Método principal para nuestra regla de negocio
-    Double calcularPrecioVenta(GrupoElectrogeno grupo);
+    Double calcularPrecioVenta(com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno grupo);
 
     // Método para guardar usando el repositorio
-    GrupoElectrogeno guardarGrupo(GrupoElectrogeno grupo);
+    GrupoElectrogenoResponseDTO guardarGrupo(GrupoElectrogenoRequestDTO dto);
 
     // Métodos CRUD básicos para RF01
-    GrupoElectrogeno obtenerPorId(Long id);
-    GrupoElectrogeno actualizarGrupo(Long id, GrupoElectrogeno grupo);
+    GrupoElectrogenoResponseDTO obtenerPorId(Long id);
+    GrupoElectrogenoResponseDTO actualizarGrupo(Long id, GrupoElectrogenoRequestDTO dto);
     void eliminarGrupo(Long id);
 
     // Nuevos métodos para el Sprint 4
-    List<GrupoElectrogeno> buscarPorCombustible(TipoCombustible combustible);
+    List<GrupoElectrogenoResponseDTO> buscarPorCombustible(TipoCombustible combustible);
 
     // Devolvemos DTOs porque el PDF pide estrictamente "una lista con el código y la vida útil"
-    List<com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO> buscarMovilesPorEje(MaterialEje material);
+    List<GrupoElectrogenoResponseDTO> buscarMovilesPorEje(MaterialEje material);
 }

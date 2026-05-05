@@ -1,10 +1,11 @@
 package com.jfra_13.grupos_electrogenos.controller;
 
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO;
-import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 import com.jfra_13.grupos_electrogenos.service.GrupoElectrogenoService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,19 +24,19 @@ public class GrupoElectrogenoController {
     }
 
     @PostMapping
-    public ResponseEntity<GrupoElectrogeno> crearGrupo(@RequestBody GrupoElectrogeno grupo) {
-        GrupoElectrogeno nuevoGrupo = service.guardarGrupo(grupo);
+    public ResponseEntity<GrupoElectrogenoResponseDTO> crearGrupo(@Valid @RequestBody GrupoElectrogenoRequestDTO dto) {
+        GrupoElectrogenoResponseDTO nuevoGrupo = service.guardarGrupo(dto);
         return new ResponseEntity<>(nuevoGrupo, HttpStatus.CREATED);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<GrupoElectrogeno> obtenerGrupo(@PathVariable Long id) {
+    public ResponseEntity<GrupoElectrogenoResponseDTO> obtenerGrupo(@PathVariable Long id) {
         return ResponseEntity.ok(service.obtenerPorId(id));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<GrupoElectrogeno> modificarGrupo(@PathVariable Long id, @RequestBody GrupoElectrogeno grupo) {
-        return ResponseEntity.ok(service.actualizarGrupo(id, grupo));
+    public ResponseEntity<GrupoElectrogenoResponseDTO> modificarGrupo(@PathVariable Long id, @Valid @RequestBody GrupoElectrogenoRequestDTO dto) {
+        return ResponseEntity.ok(service.actualizarGrupo(id, dto));
     }
 
     @DeleteMapping("/{id}")
@@ -46,15 +47,15 @@ public class GrupoElectrogenoController {
 
     @GetMapping("/{id}/precio")
     public ResponseEntity<Double> cotizarPrecio(@PathVariable Long id) {
-        GrupoElectrogeno grupo = service.obtenerPorId(id);
-        Double precio = service.calcularPrecioVenta(grupo);
-        return ResponseEntity.ok(precio);
+        GrupoElectrogenoResponseDTO grupo = service.obtenerPorId(id);
+        // Nota: El service de negocio sigue exponiendo calcularPrecioVenta para uso interno
+        // pero aquí podemos devolver el campo ya calculado en el DTO o llamar al service si se requiere frescura.
+        return ResponseEntity.ok(grupo.getPrecioVentaCalculado());
     }
 
-
     @GetMapping("/filtro/combustible")
-    public ResponseEntity<List<GrupoElectrogeno>> filtrarPorCombustible(@RequestParam TipoCombustible tipo) {
-        List<GrupoElectrogeno> resultados = service.buscarPorCombustible(tipo);
+    public ResponseEntity<List<GrupoElectrogenoResponseDTO>> filtrarPorCombustible(@RequestParam TipoCombustible tipo) {
+        List<GrupoElectrogenoResponseDTO> resultados = service.buscarPorCombustible(tipo);
         return ResponseEntity.ok(resultados);
     }
 
@@ -62,8 +63,7 @@ public class GrupoElectrogenoController {
     public ResponseEntity<List<GrupoElectrogenoResponseDTO>> filtrarMoviles(
             @RequestParam MaterialEje materialEje) {
 
-        List<com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO> resultados =
-                service.buscarMovilesPorEje(materialEje);
+        List<GrupoElectrogenoResponseDTO> resultados = service.buscarMovilesPorEje(materialEje);
         return ResponseEntity.ok(resultados);
     }
 }
