@@ -1,11 +1,14 @@
 package com.jfra_13.grupos_electrogenos.service.impl;
 
 import com.jfra_13.grupos_electrogenos.exception.ResourceNotFoundException;
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoRequestDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogenoMovil;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
+import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
 import com.jfra_13.grupos_electrogenos.repository.GrupoElectrogenoRepository;
 import com.jfra_13.grupos_electrogenos.service.GrupoElectrogenoService;
 import org.springframework.stereotype.Service;
@@ -18,48 +21,53 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
 
     private final GrupoElectrogenoRepository repository;
 
-    // Inyección de dependencias por constructor (Buena práctica)
     public GrupoElectrogenoServiceImpl(GrupoElectrogenoRepository repository) {
         this.repository = repository;
     }
 
     @Override
-    public GrupoElectrogeno guardarGrupo(GrupoElectrogeno grupo) {
-        return repository.save(grupo);
+    public GrupoElectrogenoResponseDTO guardarGrupo(GrupoElectrogenoRequestDTO dto) {
+        GrupoElectrogeno entidad = mapToEntity(dto);
+        GrupoElectrogeno guardado = repository.save(entidad);
+        return mapToResponseDTO(guardado);
     }
 
     @Override
-    public GrupoElectrogeno obtenerPorId(Long id) {
-        return repository.findById(id)
+    public GrupoElectrogenoResponseDTO obtenerPorId(Long id) {
+        GrupoElectrogeno entidad = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo Electrógeno no encontrado con ID: " + id));
+        return mapToResponseDTO(entidad);
     }
 
     @Override
-    public GrupoElectrogeno actualizarGrupo(Long id, GrupoElectrogeno grupoDetails) {
-        GrupoElectrogeno existing = obtenerPorId(id);
+    public GrupoElectrogenoResponseDTO actualizarGrupo(Long id, GrupoElectrogenoRequestDTO dto) {
+        GrupoElectrogeno existing = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo Electrógeno no encontrado con ID: " + id));
 
-        existing.setCodigo(grupoDetails.getCodigo());
-        existing.setVidaUtil(grupoDetails.getVidaUtil());
-        existing.setTipoCombustible(grupoDetails.getTipoCombustible());
-        existing.setTipoArranque(grupoDetails.getTipoArranque());
-        existing.setPMin(grupoDetails.getPMin());
-        existing.setPMax(grupoDetails.getPMax());
-        existing.setInsonorizado(grupoDetails.getInsonorizado());
-        existing.setCapo(grupoDetails.getCapo());
+        existing.setCodigo(dto.getCodigo());
+        existing.setVidaUtil(dto.getVidaUtil());
+        existing.setTipoCombustible(dto.getTipoCombustible());
+        existing.setTipoArranque(dto.getTipoArranque());
+        existing.setPMin(dto.getPMin());
+        existing.setPMax(dto.getPMax());
+        existing.setInsonorizado(dto.getInsonorizado());
+        existing.setCapo(dto.getCapo());
 
-        // Manejo de campos específicos si es móvil
-        if (existing instanceof GrupoElectrogenoMovil movilExistente && grupoDetails instanceof GrupoElectrogenoMovil movilNuevo) {
-            movilExistente.setCantidadRuedas(movilNuevo.getCantidadRuedas());
-            movilExistente.setMaterialEje(movilNuevo.getMaterialEje());
+        if (existing instanceof GrupoElectrogenoMovil movilExistente && Boolean.TRUE.equals(dto.getEsMovil())) {
+            movilExistente.setCantidadRuedas(dto.getCantidadRuedas());
+            movilExistente.setMaterialEje(dto.getMaterialEje());
         }
 
-        return repository.save(existing);
+        GrupoElectrogeno actualizado = repository.save(existing);
+        return mapToResponseDTO(actualizado);
     }
 
     @Override
     public void eliminarGrupo(Long id) {
-        GrupoElectrogeno existing = obtenerPorId(id);
-        repository.delete(existing);
+        if (!repository.existsById(id)) {
+            throw new ResourceNotFoundException("Grupo Electrógeno no encontrado con ID: " + id);
+        }
+        repository.deleteById(id);
     }
 
     @Override
@@ -68,24 +76,19 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
             throw new IllegalArgumentException("Faltan datos básicos para calcular el precio.");
         }
 
-        // 1. Cálculo base: años de vida útil * potencia media
         double potenciaMedia = (grupo.getPMin() + grupo.getPMax()) / 2.0;
         double precio = grupo.getVidaUtil() * potenciaMedia;
 
-        // 2. Modificador Acústico: +10 si es insonorizado Y tiene capó
         if (Boolean.TRUE.equals(grupo.getInsonorizado()) && Boolean.TRUE.equals(grupo.getCapo())) {
             precio += 10.0;
         }
 
-        // 3. Modificador de Arranque: +15 si es automático
         if (TipoArranque.AUTOMATICO.equals(grupo.getTipoArranque())) {
             precio += 15.0;
         }
 
-        // 4. Modificador de Valor Agregado (Fijo vs Móvil)
         if (grupo instanceof GrupoElectrogenoMovil movil) {
-            // Regla para Móviles
-            double valorAgregado = movil.getCantidadRuedas() * 5.0;
+            double valorAgregado = (movil.getCantidadRuedas() != null ? movil.getCantidadRuedas() : 0) * 5.0;
             if (MaterialEje.ACERO.equals(movil.getMaterialEje())) {
                 valorAgregado += 20.0;
             } else if (MaterialEje.ALEACION.equals(movil.getMaterialEje())) {
@@ -93,7 +96,6 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
             }
             precio += valorAgregado;
         } else {
-            // Regla para Fijos: Constante de 200
             precio += 200.0;
         }
 
@@ -101,22 +103,62 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
     }
 
     @Override
-    public List<GrupoElectrogeno> buscarPorCombustible(TipoCombustible combustible) {
-        return repository.findByTipoCombustibleOrderByPMaxDesc(combustible);
+    public List<GrupoElectrogenoResponseDTO> buscarPorCombustible(TipoCombustible combustible) {
+        return repository.findByTipoCombustibleOrderByPMaxDesc(combustible).stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public List<com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO> buscarMovilesPorEje(MaterialEje material) {
+    public List<GrupoElectrogenoResponseDTO> buscarMovilesPorEje(MaterialEje material) {
         List<GrupoElectrogenoMovil> moviles = repository.buscarMovilesAutomaticosPorEje(material);
+        return moviles.stream().map(this::mapToResponseDTO).collect(Collectors.toList());
+    }
 
-        // El requerimiento RF07 pide devolver SOLO código y vida útil.
-        // Mapeamos las entidades al DTO usando el patrón Builder que configuramos con Lombok.
-        return moviles.stream().map(movil ->
-                com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO.builder()
-                        .codigo(movil.getCodigo())
-                        .vidaUtil(movil.getVidaUtil())
-                        // Omitimos el resto de datos para cumplir con el filtro estricto
-                        .build()
-        ).collect(Collectors.toList());
+    private GrupoElectrogeno mapToEntity(GrupoElectrogenoRequestDTO dto) {
+        GrupoElectrogeno entidad;
+        if (Boolean.TRUE.equals(dto.getEsMovil())) {
+            GrupoElectrogenoMovil movil = new GrupoElectrogenoMovil();
+            movil.setCantidadRuedas(dto.getCantidadRuedas());
+            movil.setMaterialEje(dto.getMaterialEje());
+            entidad = movil;
+        } else {
+            entidad = new GrupoElectrogeno();
+        }
+
+        entidad.setCodigo(dto.getCodigo());
+        entidad.setVidaUtil(dto.getVidaUtil());
+        entidad.setTipoCombustible(dto.getTipoCombustible());
+        entidad.setTipoArranque(dto.getTipoArranque());
+        entidad.setPMin(dto.getPMin());
+        entidad.setPMax(dto.getPMax());
+        entidad.setInsonorizado(dto.getInsonorizado());
+        entidad.setCapo(dto.getCapo());
+        return entidad;
+    }
+
+    private GrupoElectrogenoResponseDTO mapToResponseDTO(GrupoElectrogeno entidad) {
+        GrupoElectrogenoResponseDTO.GrupoElectrogenoResponseDTOBuilder builder = GrupoElectrogenoResponseDTO.builder()
+                .id(entidad.getId())
+                .codigo(entidad.getCodigo())
+                .vidaUtil(entidad.getVidaUtil())
+                .tipoCombustible(entidad.getTipoCombustible())
+                .tipoArranque(entidad.getTipoArranque())
+                .pMin(entidad.getPMin())
+                .pMax(entidad.getPMax())
+                .insonorizado(entidad.getInsonorizado())
+                .capo(entidad.getCapo())
+                .potenciaMedia((entidad.getPMin() + entidad.getPMax()) / 2.0)
+                .precioVentaCalculado(calcularPrecioVenta(entidad));
+
+        if (entidad instanceof GrupoElectrogenoMovil movil) {
+            builder.tipoGrupo("Móvil")
+                    .cantidadRuedas(movil.getCantidadRuedas())
+                    .materialEje(movil.getMaterialEje());
+        } else {
+            builder.tipoGrupo("Fijo");
+        }
+
+        return builder.build();
     }
 }

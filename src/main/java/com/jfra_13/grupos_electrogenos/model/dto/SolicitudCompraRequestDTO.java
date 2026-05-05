@@ -21,13 +21,14 @@ public class SolicitudCompraRequestDTO {
     private Integer cantidad;
 
     @NotNull(message = "La potencia requerida es obligatoria")
+    @Min(value = 1, message = "La potencia requerida debe ser mayor a 0")
     private Double potenciaRequerida;
 
     @NotNull(message = "El tipo de combustible es obligatorio")
     private TipoCombustible tipoCombustible;
 
     @NotNull(message = "La vida útil solicitada es obligatoria")
-    @Min(value = 1, message = "La vida útil debe ser mayor a 0")
+    @Min(value = 1, message = "La vida útil debe ser al menos 1 año")
     private Integer vidaUtilSolicitada;
 
     @NotNull(message = "El ID de la entidad es obligatorio")

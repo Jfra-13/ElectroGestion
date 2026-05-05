@@ -3,7 +3,7 @@ package com.jfra_13.grupos_electrogenos.controller;
 import com.jfra_13.grupos_electrogenos.model.dto.RankingEntidadDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.ReportePagoDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
-import com.jfra_13.grupos_electrogenos.model.entity.SolicitudCompra;
+import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
 import com.jfra_13.grupos_electrogenos.service.SolicitudCompraService;
 import jakarta.validation.Valid;
@@ -26,17 +26,17 @@ public class SolicitudCompraController {
     }
 
     @PostMapping
-    public ResponseEntity<SolicitudCompra> crearSolicitud(@Valid @RequestBody SolicitudCompraRequestDTO dto) {
+    public ResponseEntity<SolicitudCompraResponseDTO> crearSolicitud(@Valid @RequestBody SolicitudCompraRequestDTO dto) {
         return new ResponseEntity<>(service.crearSolicitud(dto), HttpStatus.CREATED);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SolicitudCompra> obtenerSolicitud(@PathVariable Long id) {
+    public ResponseEntity<SolicitudCompraResponseDTO> obtenerSolicitud(@PathVariable Long id) {
         return ResponseEntity.ok(service.obtenerPorId(id));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<SolicitudCompra> actualizarSolicitud(@PathVariable Long id, @Valid @RequestBody SolicitudCompraRequestDTO dto) {
+    public ResponseEntity<SolicitudCompraResponseDTO> actualizarSolicitud(@PathVariable Long id, @Valid @RequestBody SolicitudCompraRequestDTO dto) {
         return ResponseEntity.ok(service.actualizarSolicitud(id, dto));
     }
 
