@@ -22,33 +22,47 @@ class SolicitudCompraRepositoryTest {
     private GrupoElectrogenoRepository grupoRepository;
 
     @Test
-    @DisplayName("Debe guardar una Solicitud de Compra vinculada a una Entidad y un Grupo")
-    void testGuardarSolicitud() {
-        Entidad empresa = new Entidad();
-        empresa.setNombre("Constructora ABC");
-        Entidad empresaGuardada = entidadRepository.save(empresa);
-        GrupoElectrogeno grupo = new GrupoElectrogeno();
-        grupo.setCodigo("TEST-001");
-        grupo.setTipoCombustible(TipoCombustible.GAS_NATURAL);
-        grupo.setTipoArranque(com.jfra_13.grupos_electrogenos.model.enums.TipoArranque.MANUAL);
-        grupo.setVidaUtil(10);
-        grupo.setPMin(50.0);
-        grupo.setPMax(200.0);
-        GrupoElectrogeno grupoGuardado = grupoRepository.save(grupo);
-        SolicitudCompra solicitud = new SolicitudCompra();
-        solicitud.setIdentificador("SOL-100");
-        solicitud.setNombreSolicitante("Carlos P�rez");
-        solicitud.setTipoPago(TipoPago.CHEQUE);
-        solicitud.setCantidad(2);
-        solicitud.setPotenciaRequerida(120.0);
-        solicitud.setTipoCombustible(TipoCombustible.GAS_NATURAL);
-        solicitud.setVidaUtilSolicitada(5);
-        solicitud.setEntidad(empresaGuardada);
-        solicitud.setGrupoElectrogeno(grupoGuardado);
-        SolicitudCompra solicitudGuardada = solicitudRepository.save(solicitud);
-        assertThat(solicitudGuardada).isNotNull();
-        assertThat(solicitudGuardada.getId()).isGreaterThan(0);
-        assertThat(solicitudGuardada.getEntidad().getNombre()).isEqualTo("Constructora ABC");
-        assertThat(solicitudGuardada.getGrupoElectrogeno().getCodigo()).isEqualTo("TEST-001");
+    @DisplayName("Debe fallar si el identificador está duplicado")
+    void testIdentificadorDuplicado() {
+        Entidad e = new Entidad();
+        e.setNombre("E1");
+        entidadRepository.save(e);
+
+        GrupoElectrogeno g = new GrupoElectrogeno();
+        g.setCodigo("G1");
+        g.setTipoCombustible(TipoCombustible.GASOIL);
+        g.setTipoArranque(com.jfra_13.grupos_electrogenos.model.enums.TipoArranque.MANUAL);
+        g.setVidaUtil(10);
+        g.setPMin(10.0);
+        g.setPMax(20.0);
+        grupoRepository.save(g);
+
+        SolicitudCompra s1 = new SolicitudCompra();
+        s1.setIdentificador("DUP");
+        s1.setNombreSolicitante("S1");
+        s1.setTipoPago(TipoPago.EFECTIVO);
+        s1.setCantidad(1);
+        s1.setPotenciaRequerida(15.0);
+        s1.setTipoCombustible(TipoCombustible.GASOIL);
+        s1.setVidaUtilSolicitada(5);
+        s1.setEntidad(e);
+        s1.setGrupoElectrogeno(g);
+        solicitudRepository.save(s1);
+
+        SolicitudCompra s2 = new SolicitudCompra();
+        s2.setIdentificador("DUP");
+        s2.setNombreSolicitante("S2");
+        s2.setTipoPago(TipoPago.EFECTIVO);
+        s2.setCantidad(1);
+        s2.setPotenciaRequerida(15.0);
+        s2.setTipoCombustible(TipoCombustible.GASOIL);
+        s2.setVidaUtilSolicitada(5);
+        s2.setEntidad(e);
+        s2.setGrupoElectrogeno(g);
+
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> {
+            solicitudRepository.save(s2);
+            solicitudRepository.flush();
+        });
     }
 }

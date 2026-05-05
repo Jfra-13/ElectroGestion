@@ -1,5 +1,6 @@
 package com.jfra_13.grupos_electrogenos.service;
 
+import com.jfra_13.grupos_electrogenos.exception.ResourceNotFoundException;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.entity.Entidad;
@@ -45,52 +46,47 @@ public class SolicitudCompraServiceTest {
     }
 
     @Test
-    void debeActualizarGrupoCuandoCambiaPotenciaRequerida() {
+    void debeCalcularIngresosTotalesCorrectamente() {
         // Arrange
-        Long id = 1L;
-        Entidad entidad = new Entidad();
-        entidad.setId(10L);
-        entidad.setNombre("Entidad Test");
+        GrupoElectrogeno g1 = new GrupoElectrogeno();
+        g1.setVidaUtil(10);
+        g1.setPMin(100.0);
+        g1.setPMax(200.0);
 
-        GrupoElectrogeno grupoViejo = new GrupoElectrogeno();
-        grupoViejo.setId(100L);
-        grupoViejo.setPMax(200.0);
-        grupoViejo.setTipoCombustible(TipoCombustible.GASOIL);
+        SolicitudCompra s1 = new SolicitudCompra();
+        s1.setCantidad(2);
+        s1.setGrupoElectrogeno(g1);
 
-        GrupoElectrogeno grupoNuevo = new GrupoElectrogeno();
-        grupoNuevo.setId(200L);
-        grupoNuevo.setPMax(500.0);
-        grupoNuevo.setTipoCombustible(TipoCombustible.GASOIL);
-
-        SolicitudCompra existing = new SolicitudCompra();
-        existing.setId(id);
-        existing.setTipoCombustible(TipoCombustible.GASOIL);
-        existing.setPotenciaRequerida(150.0);
-        existing.setGrupoElectrogeno(grupoViejo);
-        existing.setEntidad(entidad);
-
-        SolicitudCompraRequestDTO dto = new SolicitudCompraRequestDTO();
-        dto.setEntidadId(10L);
-        dto.setTipoCombustible(TipoCombustible.GASOIL);
-        dto.setPotenciaRequerida(400.0); // Aumenta potencia
-        dto.setCantidad(1);
-        dto.setNombreSolicitante("Juan");
-        dto.setTipoPago(TipoPago.EFECTIVO);
-        dto.setVidaUtilSolicitada(5);
-
-        when(repository.findById(id)).thenReturn(Optional.of(existing));
-        when(entidadRepository.findById(10L)).thenReturn(Optional.of(entidad));
-        when(grupoRepository.findByTipoCombustibleOrderByPMaxDesc(TipoCombustible.GASOIL))
-                .thenReturn(Collections.singletonList(grupoNuevo));
-        when(repository.save(any())).thenAnswer(i -> i.getArguments()[0]);
-        when(grupoService.calcularPrecioVenta(any())).thenReturn(1000.0);
+        when(repository.findAll()).thenReturn(Collections.singletonList(s1));
+        when(grupoService.calcularPrecioVenta(g1)).thenReturn(1000.0);
 
         // Act
-        SolicitudCompraResponseDTO response = service.actualizarSolicitud(id, dto);
+        Double total = service.calcularIngresosTotales();
 
         // Assert
-        assertNotNull(response);
-        assertEquals(200L, response.getGrupoId());
-        verify(grupoRepository, times(1)).findByTipoCombustibleOrderByPMaxDesc(TipoCombustible.GASOIL);
+        assertEquals(2000.0, total);
+        verify(repository).findAll();
+        verify(grupoService).calcularPrecioVenta(g1);
+    }
+
+    @Test
+    void debeLanzarExcepcionCuandoNoHayGrupoDisponible() {
+        // Arrange
+        SolicitudCompraRequestDTO dto = new SolicitudCompraRequestDTO();
+        dto.setEntidadId(1L);
+        dto.setPotenciaRequerida(1000.0);
+        dto.setTipoCombustible(TipoCombustible.GASOIL);
+
+        Entidad entidad = new Entidad();
+        entidad.setId(1L);
+
+        when(entidadRepository.findById(1L)).thenReturn(Optional.of(entidad));
+        when(grupoRepository.findByTipoCombustibleOrderByPMaxDesc(TipoCombustible.GASOIL))
+                .thenReturn(Collections.emptyList());
+
+        // Act & Assert
+        org.junit.jupiter.api.Assertions.assertThrows(ResourceNotFoundException.class, () -> {
+            service.crearSolicitud(dto);
+        });
     }
 }
