@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 class GrupoElectrogenoServiceTest {
@@ -43,6 +44,40 @@ class GrupoElectrogenoServiceTest {
 
         // Assert
         assertThat(precio).isEqualTo(1725.0);
+    }
+
+    @Test
+    @DisplayName("Debe calcular el precio correctamente para un Grupo Móvil con Aleación")
+    void testCalcularPrecioMovilAleacion() {
+        // Arrange
+        GrupoElectrogenoMovil movil = new GrupoElectrogenoMovil();
+        movil.setVidaUtil(5);
+        movil.setPMin(100.0);
+        movil.setPMax(100.0); // Potencia media = 100. Base = 5 * 100 = 500
+        movil.setInsonorizado(true);
+        movil.setCapo(false); // No suma los 10
+        movil.setTipoArranque(TipoArranque.MANUAL); // + 0
+        movil.setCantidadRuedas(2); // 2 * 5 = 10
+        movil.setMaterialEje(MaterialEje.ALEACION); // + 13
+        // Total esperado = 500 + 10 + 13 = 523
+
+        // Act
+        Double precio = service.calcularPrecioVenta(movil);
+
+        // Assert
+        assertThat(precio).isEqualTo(523.0);
+    }
+
+    @Test
+    @DisplayName("Debe lanzar excepción si faltan datos para el cálculo")
+    void testCalcularPrecioDatosIncompletos() {
+        GrupoElectrogeno incompleto = new GrupoElectrogeno();
+        incompleto.setVidaUtil(10);
+        // Faltan pMin y pMax
+
+        assertThatThrownBy(() -> service.calcularPrecioVenta(incompleto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Faltan datos básicos para calcular el precio.");
     }
 
     @Test

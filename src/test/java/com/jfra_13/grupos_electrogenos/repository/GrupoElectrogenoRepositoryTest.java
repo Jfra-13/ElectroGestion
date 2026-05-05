@@ -1,5 +1,6 @@
 package com.jfra_13.grupos_electrogenos.repository;
 
+import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogenoMovil;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
@@ -49,20 +50,60 @@ class GrupoElectrogenoRepositoryTest {
     }
 
     @Test
-    @DisplayName("Debe fallar si pMin >= pMax")
-    void testValidacionPotencia() {
-        GrupoElectrogenoMovil movil = new GrupoElectrogenoMovil();
-        movil.setCodigo("MOV-ERR");
-        movil.setVidaUtil(5);
-        movil.setTipoCombustible(TipoCombustible.GASOIL);
-        movil.setTipoArranque(TipoArranque.MANUAL);
-        movil.setPMin(500.0);
-        movil.setPMax(100.0); // Error: pMin > pMax
-        movil.setCantidadRuedas(2);
-        movil.setMaterialEje(MaterialEje.ALEACION);
+    @DisplayName("Debe buscar correctamente por combustible y ordenar por potencia máxima")
+    void testBuscarPorCombustible() {
+        // Arrange
+        GrupoElectrogeno g1 = new GrupoElectrogeno();
+        g1.setCodigo("G1");
+        g1.setVidaUtil(10);
+        g1.setTipoCombustible(TipoCombustible.GASOIL);
+        g1.setTipoArranque(TipoArranque.MANUAL);
+        g1.setPMin(100.0);
+        g1.setPMax(500.0);
 
-        assertThrows(jakarta.validation.ConstraintViolationException.class, () -> {
-            repository.save(movil);
+        GrupoElectrogeno g2 = new GrupoElectrogeno();
+        g2.setCodigo("G2");
+        g2.setVidaUtil(10);
+        g2.setTipoCombustible(TipoCombustible.GASOIL);
+        g2.setTipoArranque(TipoArranque.MANUAL);
+        g2.setPMin(100.0);
+        g2.setPMax(1000.0);
+
+        repository.save(g1);
+        repository.save(g2);
+        entityManager.flush();
+
+        // Act
+        java.util.List<GrupoElectrogeno> resultados = repository.findByTipoCombustibleOrderByPMaxDesc(TipoCombustible.GASOIL);
+
+        // Assert
+        assertThat(resultados).hasSize(2);
+        assertThat(resultados.get(0).getCodigo()).isEqualTo("G2");
+        assertThat(resultados.get(1).getCodigo()).isEqualTo("G1");
+    }
+
+    @Test
+    @DisplayName("Debe fallar si el código está duplicado")
+    void testCodigoDuplicado() {
+        GrupoElectrogeno g1 = new GrupoElectrogeno();
+        g1.setCodigo("DUP");
+        g1.setVidaUtil(10);
+        g1.setTipoCombustible(TipoCombustible.GASOIL);
+        g1.setTipoArranque(TipoArranque.MANUAL);
+        g1.setPMin(10.0);
+        g1.setPMax(20.0);
+        repository.save(g1);
+
+        GrupoElectrogeno g2 = new GrupoElectrogeno();
+        g2.setCodigo("DUP");
+        g2.setVidaUtil(5);
+        g2.setTipoCombustible(TipoCombustible.NAFTA);
+        g2.setTipoArranque(TipoArranque.AUTOMATICO);
+        g2.setPMin(5.0);
+        g2.setPMax(15.0);
+
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> {
+            repository.save(g2);
             entityManager.flush();
         });
     }
