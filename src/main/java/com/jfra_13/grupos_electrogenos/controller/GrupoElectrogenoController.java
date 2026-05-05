@@ -2,6 +2,7 @@ package com.jfra_13.grupos_electrogenos.controller;
 
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoMovilResumenDTO;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 import com.jfra_13.grupos_electrogenos.service.GrupoElectrogenoService;
@@ -60,10 +61,10 @@ public class GrupoElectrogenoController {
     }
 
     @GetMapping("/filtro/moviles-automaticos")
-    public ResponseEntity<List<GrupoElectrogenoResponseDTO>> filtrarMoviles(
+    public ResponseEntity<List<GrupoMovilResumenDTO>> filtrarMoviles(
             @RequestParam MaterialEje materialEje) {
 
-        List<GrupoElectrogenoResponseDTO> resultados = service.buscarMovilesPorEje(materialEje);
+        List<GrupoMovilResumenDTO> resultados = service.buscarMovilesPorEje(materialEje);
         return ResponseEntity.ok(resultados);
     }
 }

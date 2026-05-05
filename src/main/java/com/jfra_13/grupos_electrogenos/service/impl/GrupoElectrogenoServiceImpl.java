@@ -3,20 +3,22 @@ package com.jfra_13.grupos_electrogenos.service.impl;
 import com.jfra_13.grupos_electrogenos.exception.ResourceNotFoundException;
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoMovilResumenDTO;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogenoMovil;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
-import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
 import com.jfra_13.grupos_electrogenos.repository.GrupoElectrogenoRepository;
 import com.jfra_13.grupos_electrogenos.service.GrupoElectrogenoService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional(readOnly = true)
 public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
 
     private final GrupoElectrogenoRepository repository;
@@ -26,6 +28,7 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
     }
 
     @Override
+    @Transactional
     public GrupoElectrogenoResponseDTO guardarGrupo(GrupoElectrogenoRequestDTO dto) {
         GrupoElectrogeno entidad = mapToEntity(dto);
         GrupoElectrogeno guardado = repository.save(entidad);
@@ -40,6 +43,7 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
     }
 
     @Override
+    @Transactional
     public GrupoElectrogenoResponseDTO actualizarGrupo(Long id, GrupoElectrogenoRequestDTO dto) {
         GrupoElectrogeno existing = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo Electrógeno no encontrado con ID: " + id));
@@ -63,6 +67,7 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
     }
 
     @Override
+    @Transactional
     public void eliminarGrupo(Long id) {
         if (!repository.existsById(id)) {
             throw new ResourceNotFoundException("Grupo Electrógeno no encontrado con ID: " + id);
@@ -110,9 +115,14 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
     }
 
     @Override
-    public List<GrupoElectrogenoResponseDTO> buscarMovilesPorEje(MaterialEje material) {
+    public List<GrupoMovilResumenDTO> buscarMovilesPorEje(MaterialEje material) {
         List<GrupoElectrogenoMovil> moviles = repository.buscarMovilesAutomaticosPorEje(material);
-        return moviles.stream().map(this::mapToResponseDTO).collect(Collectors.toList());
+        return moviles.stream()
+                .map(m -> GrupoMovilResumenDTO.builder()
+                        .codigo(m.getCodigo())
+                        .vidaUtil(m.getVidaUtil())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     private GrupoElectrogeno mapToEntity(GrupoElectrogenoRequestDTO dto) {

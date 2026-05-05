@@ -2,6 +2,7 @@ package com.jfra_13.grupos_electrogenos.service;
 
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.GrupoMovilResumenDTO;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 
@@ -22,6 +23,6 @@ public interface GrupoElectrogenoService {
     // Nuevos métodos para el Sprint 4
     List<GrupoElectrogenoResponseDTO> buscarPorCombustible(TipoCombustible combustible);
 
-    // Devolvemos DTOs porque el PDF pide estrictamente "una lista con el código y la vida útil"
-    List<GrupoElectrogenoResponseDTO> buscarMovilesPorEje(MaterialEje material);
+    // Devolvemos DTOs específicos porque el RF07 pide estrictamente "una lista con el código y la vida útil"
+    List<GrupoMovilResumenDTO> buscarMovilesPorEje(MaterialEje material);
 }
