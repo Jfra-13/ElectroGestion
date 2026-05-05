@@ -9,12 +9,12 @@ import com.jfra_13.grupos_electrogenos.service.GrupoElectrogenoService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@CrossOrigin(origins = "*")
 @RequestMapping("/api/v1/grupos-electrogenos")
 public class GrupoElectrogenoController {
 
@@ -25,6 +25,7 @@ public class GrupoElectrogenoController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<GrupoElectrogenoResponseDTO> crearGrupo(@Valid @RequestBody GrupoElectrogenoRequestDTO dto) {
         GrupoElectrogenoResponseDTO nuevoGrupo = service.guardarGrupo(dto);
         return new ResponseEntity<>(nuevoGrupo, HttpStatus.CREATED);
@@ -36,11 +37,13 @@ public class GrupoElectrogenoController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<GrupoElectrogenoResponseDTO> modificarGrupo(@PathVariable Long id, @Valid @RequestBody GrupoElectrogenoRequestDTO dto) {
         return ResponseEntity.ok(service.actualizarGrupo(id, dto));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> eliminarGrupo(@PathVariable Long id) {
         service.eliminarGrupo(id);
         return ResponseEntity.noContent().build();
