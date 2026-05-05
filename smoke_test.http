@@ -1,6 +1,18 @@
-### 1. Crear un Grupo Electrogeno (POST)
-POST http://localhost:8080/api/v1/grupos-electrogenos
+### 0. Auth - Login Admin
+POST http://localhost:8082/api/v1/auth/login
 Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+> {% client.global.set("auth_token", response.body.token); %}
+
+### 1. Crear un Grupo Electrogeno (POST) - ADMIN REQUIRED
+POST http://localhost:8082/api/v1/grupos-electrogenos
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
 
 {
   "codigo": "G-POW-500",
@@ -13,15 +25,16 @@ Content-Type: application/json
   "capo": true
 }
 
-### 2. Cotizar Precio Real (GET)
-GET http://localhost:8080/api/v1/grupos-electrogenos/1/precio
+### 2. Cotizar Precio Real (GET) - PUBLIC
+GET http://localhost:8082/api/v1/grupos-electrogenos/1/precio
 
-### 3. Obtener el Grupo Creado (GET)
-GET http://localhost:8080/api/v1/grupos-electrogenos/1
+### 3. Obtener el Grupo Creado (GET) - PUBLIC
+GET http://localhost:8082/api/v1/grupos-electrogenos/1
 
-### 4. Crear una Solicitud de Compra (Asignacion Automatica)
-POST http://localhost:8080/api/v1/ventas
+### 4. Crear una Solicitud de Compra (POST) - ADMIN REQUIRED
+POST http://localhost:8082/api/v1/ventas
 Content-Type: application/json
+Authorization: Bearer {{auth_token}}
 
 {
   "nombreSolicitante": "Ing. Juan Perez",
@@ -33,5 +46,5 @@ Content-Type: application/json
   "vidaUtilSolicitada": 5
 }
 
-### 5. Ver Ingresos Totales
-GET http://localhost:8080/api/v1/ventas/ingresos-totales
+### 5. Ver Ingresos Totales - PUBLIC
+GET http://localhost:8082/api/v1/ventas/ingresos-totales

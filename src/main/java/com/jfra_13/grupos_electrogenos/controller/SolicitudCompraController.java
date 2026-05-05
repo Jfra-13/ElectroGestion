@@ -9,6 +9,7 @@ import com.jfra_13.grupos_electrogenos.service.SolicitudCompraService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -26,6 +27,7 @@ public class SolicitudCompraController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SolicitudCompraResponseDTO> crearSolicitud(@Valid @RequestBody SolicitudCompraRequestDTO dto) {
         return new ResponseEntity<>(service.crearSolicitud(dto), HttpStatus.CREATED);
     }
@@ -36,11 +38,13 @@ public class SolicitudCompraController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SolicitudCompraResponseDTO> actualizarSolicitud(@PathVariable Long id, @Valid @RequestBody SolicitudCompraRequestDTO dto) {
         return ResponseEntity.ok(service.actualizarSolicitud(id, dto));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> eliminarSolicitud(@PathVariable Long id) {
         service.eliminarSolicitud(id);
         return ResponseEntity.noContent().build();
