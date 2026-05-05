@@ -30,6 +30,9 @@ class SolicitudCompraRepositoryTest {
         GrupoElectrogeno grupo = new GrupoElectrogeno();
         grupo.setCodigo("TEST-001");
         grupo.setTipoCombustible(TipoCombustible.GAS_NATURAL);
+        grupo.setTipoArranque(com.jfra_13.grupos_electrogenos.model.enums.TipoArranque.MANUAL);
+        grupo.setVidaUtil(10);
+        grupo.setPMin(50.0);
         grupo.setPMax(200.0);
         GrupoElectrogeno grupoGuardado = grupoRepository.save(grupo);
         SolicitudCompra solicitud = new SolicitudCompra();

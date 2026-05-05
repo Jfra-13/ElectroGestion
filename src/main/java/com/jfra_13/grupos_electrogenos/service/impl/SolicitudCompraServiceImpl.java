@@ -22,6 +22,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional(readOnly = true)
 public class SolicitudCompraServiceImpl implements SolicitudCompraService {
 
     private final SolicitudCompraRepository repository;
@@ -83,6 +84,19 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
         Entidad entidad = entidadRepository.findById(dto.getEntidadId())
                 .orElseThrow(() -> new ResourceNotFoundException("Entidad no encontrada"));
 
+        // Re-evaluar grupo si cambian potencia requerida o tipo de combustible
+        if (!existing.getTipoCombustible().equals(dto.getTipoCombustible()) || 
+            !existing.getPotenciaRequerida().equals(dto.getPotenciaRequerida())) {
+            
+            List<GrupoElectrogeno> candidatos = grupoRepository.findByTipoCombustibleOrderByPMaxDesc(dto.getTipoCombustible());
+            GrupoElectrogeno nuevoGrupo = candidatos.stream()
+                .filter(g -> g.getPMax() >= dto.getPotenciaRequerida())
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("No se encontró un Grupo Electrógeno que cumpla con la nueva potencia requerida para este combustible"));
+            
+            existing.setGrupoElectrogeno(nuevoGrupo);
+        }
+
         existing.setNombreSolicitante(dto.getNombreSolicitante());
         existing.setTipoPago(dto.getTipoPago());
         existing.setCantidad(dto.getCantidad());
@@ -116,15 +130,9 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
 
     @Override
     public Double calcularIngresosTotales() {
-        List<SolicitudCompra> todasLasVentas = repository.findAll();
-        double totalRecaudado = 0.0;
-
-        for (SolicitudCompra venta : todasLasVentas) {
-            double precioUnitario = grupoService.calcularPrecioVenta(venta.getGrupoElectrogeno());
-            totalRecaudado += (precioUnitario * venta.getCantidad());
-        }
-
-        return totalRecaudado;
+        return repository.findAll().stream()
+                .mapToDouble(venta -> grupoService.calcularPrecioVenta(venta.getGrupoElectrogeno()) * venta.getCantidad())
+                .sum();
     }
 
     private SolicitudCompraResponseDTO mapToResponseDTO(SolicitudCompra entidad) {
