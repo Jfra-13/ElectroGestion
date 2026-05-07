@@ -5,10 +5,12 @@ import com.jfra_13.grupos_electrogenos.model.dto.RankingEntidadDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.ReportePagoDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraResponseDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.PaginatedResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.entity.Entidad;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.SolicitudCompra;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
+import com.jfra_13.grupos_electrogenos.mapper.SolicitudCompraMapper;
 import com.jfra_13.grupos_electrogenos.repository.EntidadRepository;
 import com.jfra_13.grupos_electrogenos.repository.GrupoElectrogenoRepository;
 import com.jfra_13.grupos_electrogenos.repository.SolicitudCompraRepository;
@@ -18,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,15 +33,18 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
     private final GrupoElectrogenoService grupoService;
     private final EntidadRepository entidadRepository;
     private final GrupoElectrogenoRepository grupoRepository;
+    private final SolicitudCompraMapper mapper;
 
     public SolicitudCompraServiceImpl(SolicitudCompraRepository repository, 
                                       GrupoElectrogenoService grupoService, 
                                       EntidadRepository entidadRepository,
-                                      GrupoElectrogenoRepository grupoRepository) {
+                                      GrupoElectrogenoRepository grupoRepository,
+                                      SolicitudCompraMapper mapper) {
         this.repository = repository;
         this.grupoService = grupoService;
         this.entidadRepository = entidadRepository;
         this.grupoRepository = grupoRepository;
+        this.mapper = mapper;
     }
 
     @Override
@@ -46,33 +53,24 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
         Entidad entidad = entidadRepository.findById(dto.getEntidadId())
                 .orElseThrow(() -> new ResourceNotFoundException("Entidad no encontrada"));
 
-        List<GrupoElectrogeno> candidatos = grupoRepository.findByTipoCombustibleOrderByPMaxDesc(dto.getTipoCombustible());
-        
+        List<GrupoElectrogeno> candidatos = grupoRepository.findByTipoCombustibleOrderByPMaxDesc(dto.getTipoCombustible(), Pageable.unpaged()).getContent();
+
         GrupoElectrogeno grupoSeleccionado = candidatos.stream()
                 .filter(g -> g.getPMax() >= dto.getPotenciaRequerida())
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró un Grupo Electrógeno que cumpla con la potencia requerida para este combustible"));
 
-        SolicitudCompra solicitud = new SolicitudCompra();
-        solicitud.setIdentificador(UUID.randomUUID().toString().substring(0, 8));
-        solicitud.setNombreSolicitante(dto.getNombreSolicitante());
-        solicitud.setTipoPago(dto.getTipoPago());
-        solicitud.setCantidad(dto.getCantidad());
-        solicitud.setPotenciaRequerida(dto.getPotenciaRequerida());
-        solicitud.setTipoCombustible(dto.getTipoCombustible());
-        solicitud.setVidaUtilSolicitada(dto.getVidaUtilSolicitada());
-        solicitud.setEntidad(entidad);
-        solicitud.setGrupoElectrogeno(grupoSeleccionado);
+        SolicitudCompra solicitud = mapper.toEntity(dto, entidad, grupoSeleccionado, UUID.randomUUID().toString().substring(0, 8));
 
         SolicitudCompra guardada = repository.save(solicitud);
-        return mapToResponseDTO(guardada);
+        return mapper.toResponse(guardada, grupoService.calcularPrecioVenta(guardada.getGrupoElectrogeno()));
     }
 
     @Override
     public SolicitudCompraResponseDTO obtenerPorId(Long id) {
         SolicitudCompra entidad = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitud de compra no encontrada"));
-        return mapToResponseDTO(entidad);
+        return mapper.toResponse(entidad, grupoService.calcularPrecioVenta(entidad.getGrupoElectrogeno()));
     }
 
     @Override
@@ -88,7 +86,7 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
         if (!existing.getTipoCombustible().equals(dto.getTipoCombustible()) || 
             !existing.getPotenciaRequerida().equals(dto.getPotenciaRequerida())) {
             
-            List<GrupoElectrogeno> candidatos = grupoRepository.findByTipoCombustibleOrderByPMaxDesc(dto.getTipoCombustible());
+            List<GrupoElectrogeno> candidatos = grupoRepository.findByTipoCombustibleOrderByPMaxDesc(dto.getTipoCombustible(), Pageable.unpaged()).getContent();
             GrupoElectrogeno nuevoGrupo = candidatos.stream()
                 .filter(g -> g.getPMax() >= dto.getPotenciaRequerida())
                 .findFirst()
@@ -97,16 +95,10 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
             existing.setGrupoElectrogeno(nuevoGrupo);
         }
 
-        existing.setNombreSolicitante(dto.getNombreSolicitante());
-        existing.setTipoPago(dto.getTipoPago());
-        existing.setCantidad(dto.getCantidad());
-        existing.setPotenciaRequerida(dto.getPotenciaRequerida());
-        existing.setTipoCombustible(dto.getTipoCombustible());
-        existing.setVidaUtilSolicitada(dto.getVidaUtilSolicitada());
-        existing.setEntidad(entidad);
-        
+        mapper.updateEntity(dto, entidad, existing.getGrupoElectrogeno(), existing);
+
         SolicitudCompra actualizada = repository.save(existing);
-        return mapToResponseDTO(actualizada);
+        return mapper.toResponse(actualizada, grupoService.calcularPrecioVenta(actualizada.getGrupoElectrogeno()));
     }
 
     @Override
@@ -135,21 +127,13 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
                 .sum();
     }
 
-    private SolicitudCompraResponseDTO mapToResponseDTO(SolicitudCompra entidad) {
-        return SolicitudCompraResponseDTO.builder()
-                .id(entidad.getId())
-                .identificador(entidad.getIdentificador())
-                .nombreSolicitante(entidad.getNombreSolicitante())
-                .tipoPago(entidad.getTipoPago())
-                .cantidad(entidad.getCantidad())
-                .potenciaRequerida(entidad.getPotenciaRequerida())
-                .tipoCombustible(entidad.getTipoCombustible())
-                .vidaUtilSolicitada(entidad.getVidaUtilSolicitada())
-                .entidadId(entidad.getEntidad().getId())
-                .entidadNombre(entidad.getEntidad().getNombre())
-                .grupoId(entidad.getGrupoElectrogeno().getId())
-                .grupoCodigo(entidad.getGrupoElectrogeno().getCodigo())
-                .precioVentaUnitario(grupoService.calcularPrecioVenta(entidad.getGrupoElectrogeno()))
-                .build();
+    @Override
+    public PaginatedResponseDTO<SolicitudCompraResponseDTO> listarVentasPaginado(Pageable pageable) {
+        Page<SolicitudCompra> page = repository.findAll(pageable);
+        List<SolicitudCompraResponseDTO> content = page.stream()
+                .map(venta -> mapper.toResponse(venta, grupoService.calcularPrecioVenta(venta.getGrupoElectrogeno())))
+                .collect(Collectors.toList());
+
+        return new PaginatedResponseDTO<>(content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
 }

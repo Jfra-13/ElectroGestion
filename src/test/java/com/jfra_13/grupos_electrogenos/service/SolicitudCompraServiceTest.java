@@ -2,30 +2,29 @@ package com.jfra_13.grupos_electrogenos.service;
 
 import com.jfra_13.grupos_electrogenos.exception.ResourceNotFoundException;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
-import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.entity.Entidad;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.SolicitudCompra;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
-import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
+import com.jfra_13.grupos_electrogenos.mapper.SolicitudCompraMapper;
 import com.jfra_13.grupos_electrogenos.repository.EntidadRepository;
 import com.jfra_13.grupos_electrogenos.repository.GrupoElectrogenoRepository;
 import com.jfra_13.grupos_electrogenos.repository.SolicitudCompraRepository;
 import com.jfra_13.grupos_electrogenos.service.impl.SolicitudCompraServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 
 import java.util.Collections;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 public class SolicitudCompraServiceTest {
 
     @Mock
@@ -37,12 +36,12 @@ public class SolicitudCompraServiceTest {
     @Mock
     private GrupoElectrogenoRepository grupoRepository;
 
-    @InjectMocks
     private SolicitudCompraServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        service = new SolicitudCompraServiceImpl(repository, grupoService, entidadRepository, grupoRepository,
+                Mappers.getMapper(SolicitudCompraMapper.class));
     }
 
     @Test
@@ -81,12 +80,10 @@ public class SolicitudCompraServiceTest {
         entidad.setId(1L);
 
         when(entidadRepository.findById(1L)).thenReturn(Optional.of(entidad));
-        when(grupoRepository.findByTipoCombustibleOrderByPMaxDesc(TipoCombustible.GASOIL))
-                .thenReturn(Collections.emptyList());
+        when(grupoRepository.findByTipoCombustibleOrderByPMaxDesc(TipoCombustible.GASOIL, org.springframework.data.domain.Pageable.unpaged()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(Collections.emptyList()));
 
         // Act & Assert
-        org.junit.jupiter.api.Assertions.assertThrows(ResourceNotFoundException.class, () -> {
-            service.crearSolicitud(dto);
-        });
+        org.junit.jupiter.api.Assertions.assertThrows(ResourceNotFoundException.class, () -> service.crearSolicitud(dto));
     }
 }
