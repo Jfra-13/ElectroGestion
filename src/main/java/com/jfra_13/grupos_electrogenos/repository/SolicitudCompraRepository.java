@@ -5,6 +5,8 @@ import com.jfra_13.grupos_electrogenos.model.dto.ReportePagoDTO;
 import com.jfra_13.grupos_electrogenos.model.entity.SolicitudCompra;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -23,4 +25,7 @@ public interface SolicitudCompraRepository extends JpaRepository<SolicitudCompra
     @Query("SELECT s.nombreSolicitante AS solicitante, s.cantidad AS cantidad " +
             "FROM SolicitudCompra s WHERE s.tipoPago = :tipoPago ORDER BY s.cantidad DESC")
     List<ReportePagoDTO> obtenerReportePorTipoPago(@Param("tipoPago") TipoPago tipoPago);
+
+    // Variante paginada para listar ventas filtradas por tipo de pago
+    Page<SolicitudCompra> findByTipoPago(TipoPago tipoPago, Pageable pageable);
 }
