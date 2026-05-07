@@ -4,14 +4,16 @@ import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogenoMovil;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
+import com.jfra_13.grupos_electrogenos.mapper.GrupoElectrogenoMapper;
 import com.jfra_13.grupos_electrogenos.repository.GrupoElectrogenoRepository;
 import com.jfra_13.grupos_electrogenos.service.impl.GrupoElectrogenoServiceImpl;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,8 +24,12 @@ class GrupoElectrogenoServiceTest {
     @Mock
     private GrupoElectrogenoRepository repository; // Simulamos la base de datos
 
-    @InjectMocks
     private GrupoElectrogenoServiceImpl service; // Inyectamos el mock en nuestro servicio
+
+    @BeforeEach
+    void setUpService() {
+        service = new GrupoElectrogenoServiceImpl(repository, Mappers.getMapper(GrupoElectrogenoMapper.class));
+    }
 
     @Test
     @DisplayName("Debe calcular el precio correctamente para un Grupo Fijo (Equipado)")
