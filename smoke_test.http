@@ -48,3 +48,16 @@ Authorization: Bearer {{auth_token}}
 
 ### 5. Ver Ingresos Totales - PUBLIC
 GET http://localhost:8082/api/v1/ventas/ingresos-totales
+
+### 6. Listar grupos por combustible (paginado, orden descendente por pMax)
+GET http://localhost:8082/api/v1/grupos-electrogenos/filtro/combustible?tipo=GASOIL&page=0&size=5&sort=pMax,desc
+
+### 7. Listar grupos por combustible (paginado, orden ascendente por pMax)
+GET http://localhost:8082/api/v1/grupos-electrogenos/filtro/combustible?tipo=GASOIL&page=0&size=5&sort=pMax,asc
+
+### 8. Listar ventas (paginado, orden ascendente por id)
+GET http://localhost:8082/api/v1/ventas?page=0&size=5&sort=id,asc
+
+### 9. Listar ventas (paginado, orden descendente por id)
+GET http://localhost:8082/api/v1/ventas?page=0&size=5&sort=id,desc
+
