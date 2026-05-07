@@ -7,6 +7,8 @@ import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 
 import java.util.List;
+import org.springframework.data.domain.Pageable;
+import com.jfra_13.grupos_electrogenos.model.dto.PaginatedResponseDTO;
 
 public interface GrupoElectrogenoService {
     // Método principal para nuestra regla de negocio
@@ -23,6 +25,10 @@ public interface GrupoElectrogenoService {
     // Nuevos métodos para el Sprint 4
     List<GrupoElectrogenoResponseDTO> buscarPorCombustible(TipoCombustible combustible);
 
+    // Variantes paginadas
+    PaginatedResponseDTO<GrupoElectrogenoResponseDTO> buscarPorCombustiblePaginado(TipoCombustible combustible, Pageable pageable);
+
     // Devolvemos DTOs específicos porque el RF07 pide estrictamente "una lista con el código y la vida útil"
     List<GrupoMovilResumenDTO> buscarMovilesPorEje(MaterialEje material);
+    PaginatedResponseDTO<GrupoMovilResumenDTO> buscarMovilesPorEjePaginado(MaterialEje material, Pageable pageable);
 }

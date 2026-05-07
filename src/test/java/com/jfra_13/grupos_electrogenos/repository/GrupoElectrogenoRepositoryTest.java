@@ -74,7 +74,7 @@ class GrupoElectrogenoRepositoryTest {
         entityManager.flush();
 
         // Act
-        java.util.List<GrupoElectrogeno> resultados = repository.findByTipoCombustibleOrderByPMaxDesc(TipoCombustible.GASOIL);
+        java.util.List<GrupoElectrogeno> resultados = repository.findByTipoCombustibleOrderByPMaxDesc(TipoCombustible.GASOIL, org.springframework.data.domain.Pageable.unpaged()).getContent();
 
         // Assert
         assertThat(resultados).hasSize(2);

@@ -5,6 +5,8 @@ import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogenoMovil;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,10 +20,10 @@ public interface GrupoElectrogenoRepository extends JpaRepository<GrupoElectroge
     // Spring Boot lee el nombre del método y arma el SQL "SELECT * WHERE tipoCombustible = ? ORDER BY pMax DESC"
     // Le decimos a Spring la consulta exacta para que no se confunda con las mayúsculas de pMax
     @Query("SELECT g FROM GrupoElectrogeno g WHERE g.tipoCombustible = :tipoCombustible ORDER BY g.pMax DESC")
-    List<GrupoElectrogeno> findByTipoCombustibleOrderByPMaxDesc(@Param("tipoCombustible") TipoCombustible tipoCombustible);
+    Page<GrupoElectrogeno> findByTipoCombustibleOrderByPMaxDesc(@Param("tipoCombustible") TipoCombustible tipoCombustible, Pageable pageable);
 
     // RF07: Listar móviles automáticos según el material del eje
     // Como GrupoElectrogenoMovil hereda de GrupoElectrogeno, usamos JPQL para buscar específicamente en la clase hija
     @Query("SELECT m FROM GrupoElectrogenoMovil m WHERE m.tipoArranque = 'AUTOMATICO' AND m.materialEje = :material")
-    List<GrupoElectrogenoMovil> buscarMovilesAutomaticosPorEje(@Param("material") MaterialEje material);
+    Page<GrupoElectrogenoMovil> buscarMovilesAutomaticosPorEje(@Param("material") MaterialEje material, Pageable pageable);
 }
