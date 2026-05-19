@@ -1,5 +1,6 @@
 package com.jfra_13.grupos_electrogenos.model.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
@@ -32,10 +33,12 @@ public class GrupoElectrogenoRequestDTO {
 
     @NotNull(message = "La potencia mínima es obligatoria")
     @Min(value = 0, message = "La potencia mínima no puede ser negativa")
+    @JsonProperty("pMin")
     private Double pMin;
 
     @NotNull(message = "La potencia máxima es obligatoria")
     @Min(value = 1, message = "La potencia máxima debe ser al menos 1")
+    @JsonProperty("pMax")
     private Double pMax;
 
     private Boolean insonorizado;

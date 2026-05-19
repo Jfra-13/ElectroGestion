@@ -3,7 +3,6 @@ package com.jfra_13.grupos_electrogenos.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
-import com.jfra_13.grupos_electrogenos.model.entity.Entidad;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
@@ -17,6 +16,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,10 +39,8 @@ public class FlujoCompraIntegrationTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void flujoCompletoCompra() throws Exception {
-        // 1. Crear Entidad
-        Entidad entidad = new Entidad();
-        entidad.setNombre("Entidad Integracion");
-        entidad = entidadRepository.save(entidad);
+        // 1. Usar la entidad semilla fija
+        assertTrue(entidadRepository.existsById(1L), "Debe existir la entidad semilla con ID 1");
 
         // 2. Crear Grupo Electrógeno
         GrupoElectrogenoRequestDTO grupoDTO = GrupoElectrogenoRequestDTO.builder()
@@ -62,7 +60,7 @@ public class FlujoCompraIntegrationTest {
 
         // 3. Crear Solicitud de Compra
         SolicitudCompraRequestDTO solicitudDTO = new SolicitudCompraRequestDTO();
-        solicitudDTO.setEntidadId(entidad.getId());
+        solicitudDTO.setEntidadId(1L);
         solicitudDTO.setNombreSolicitante("Comprador Test");
         solicitudDTO.setCantidad(2);
         solicitudDTO.setPotenciaRequerida(300.0);
