@@ -31,7 +31,7 @@ GET http://localhost:8082/api/v1/grupos-electrogenos/1/precio
 ### 3. Obtener el Grupo Creado (GET) - PUBLIC
 GET http://localhost:8082/api/v1/grupos-electrogenos/1
 
-### 4. Crear una Solicitud de Compra (POST) - ADMIN REQUIRED
+### 4. Crear una Solicitud de Compra (POST) - ADMIN REQUIRED (entidadId semilla = 1)
 POST http://localhost:8082/api/v1/ventas
 Content-Type: application/json
 Authorization: Bearer {{auth_token}}

@@ -1,0 +1,11 @@
+{
+  "codigo": "G-POW-500-TST",
+  "vidaUtil": 10,
+  "tipoCombustible": "GASOIL",
+  "tipoArranque": "AUTOMATICO",
+  "pMin": 100.0,
+  "pMax": 500.0,
+  "insonorizado": true,
+  "capo": true,
+  "esMovil": false
+}

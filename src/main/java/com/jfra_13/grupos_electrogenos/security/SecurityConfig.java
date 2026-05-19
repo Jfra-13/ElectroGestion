@@ -39,16 +39,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors(Customizer.withDefaults())
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll()
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/grupos-electrogenos/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes-compra/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/ventas/**").permitAll()
-                .anyRequest().authenticated()
+                .cors(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/grupos-electrogenos/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes-compra/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/ventas/**").permitAll()
+                        .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/h2-console").permitAll()
+                        .anyRequest().authenticated()
+
             )
             .addFilterBefore(jwtAuthorizationFilter, UsernamePasswordAuthenticationFilter.class);
         
