@@ -5,12 +5,14 @@ import com.jfra_13.grupos_electrogenos.model.entity.Usuario;
 import com.jfra_13.grupos_electrogenos.repository.RoleRepository;
 import com.jfra_13.grupos_electrogenos.repository.UsuarioRepository;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
 
 @Component
+@Profile({"dev", "test"})
 public class DataInitializer implements CommandLineRunner {
 
     private final UsuarioRepository usuarioRepository;
@@ -24,7 +26,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     @Override
-    public void run(String... args) throws Exception {
+    public void run(String... args) {
         // Crear roles si no existen
         Role adminRole = roleRepository.findByNombre("ROLE_ADMIN")
                 .orElseGet(() -> roleRepository.save(Role.builder().nombre("ROLE_ADMIN").build()));
