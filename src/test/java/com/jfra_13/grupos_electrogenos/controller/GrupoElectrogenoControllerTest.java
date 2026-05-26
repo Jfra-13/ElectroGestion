@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,13 +34,13 @@ class GrupoElectrogenoControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private GrupoElectrogenoService service;
 
-    @MockBean
+    @MockitoBean
     private JwtUtil jwtUtil;
 
-    @MockBean
+    @MockitoBean
     private org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
 
     @Autowired
@@ -97,5 +98,72 @@ class GrupoElectrogenoControllerTest {
         mockMvc.perform(get("/api/v1/grupos-electrogenos/1/precio"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(1500.0));
+    }
+
+    @Test
+    @DisplayName("Debe retornar lista paginada de todos los grupos electrógenos")
+    void testListarTodosGrupos() throws Exception {
+        // Arrange
+        GrupoElectrogenoResponseDTO grupo1 = GrupoElectrogenoResponseDTO.builder()
+                .id(1L)
+                .codigo("FJO-001")
+                .vidaUtil(10)
+                .tipoCombustible(TipoCombustible.GASOIL)
+                .tipoArranque(TipoArranque.AUTOMATICO)
+                .pMin(100.0)
+                .pMax(200.0)
+                .precioVentaCalculado(1500.0)
+                .build();
+
+        com.jfra_13.grupos_electrogenos.model.dto.PaginatedResponseDTO<GrupoElectrogenoResponseDTO> paginatedResponse =
+                new com.jfra_13.grupos_electrogenos.model.dto.PaginatedResponseDTO<>(
+                        java.util.Arrays.asList(grupo1),
+                        0,
+                        10,
+                        1,
+                        1
+                );
+
+        when(service.listarPaginado(any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(paginatedResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/grupos-electrogenos")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .param("sort", "id,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].codigo").value("FJO-001"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("Debe actualizar el stock correctamente")
+    void testActualizarStock() throws Exception {
+        // Arrange
+        GrupoElectrogenoResponseDTO responseDTO = GrupoElectrogenoResponseDTO.builder()
+                .id(1L)
+                .codigo("G-POW-500")
+                .vidaUtil(10)
+                .tipoCombustible(TipoCombustible.GASOIL)
+                .tipoArranque(TipoArranque.AUTOMATICO)
+                .pMin(100.0)
+                .pMax(200.0)
+                .stock(50)
+                .precioVentaCalculado(1500.0)
+                .build();
+
+        when(service.actualizarStock(1L, 50)).thenReturn(responseDTO);
+
+        // Act & Assert
+        mockMvc.perform(patch("/api/v1/grupos-electrogenos/1/stock")
+                        .param("nuevoStock", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.stock").value(50));
     }
 }

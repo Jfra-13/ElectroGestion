@@ -29,4 +29,5 @@ public class GrupoElectrogenoResponseDTO {
     // Campos específicos para móviles si aplica
     private Integer cantidadRuedas;
     private MaterialEje materialEje;
+    private Integer stock;
 }

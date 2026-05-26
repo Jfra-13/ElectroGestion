@@ -44,6 +44,9 @@ public class GrupoElectrogenoRequestDTO {
     private Boolean insonorizado;
     private Boolean capo;
 
+    @Min(value = 0, message = "El stock no puede ser negativo")
+    private Integer stock;
+
     // Campos para el caso de ser móvil
     private Integer cantidadRuedas;
     private MaterialEje materialEje;
