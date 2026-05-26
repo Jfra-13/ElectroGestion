@@ -56,6 +56,10 @@ public class GrupoElectrogeno {
     private Boolean insonorizado;
     private Boolean capo;
 
+    @Min(0)
+    @Column(nullable = false)
+    private Integer stock = 0;  // Stock disponible
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

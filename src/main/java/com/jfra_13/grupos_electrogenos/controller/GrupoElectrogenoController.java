@@ -33,6 +33,24 @@ public class GrupoElectrogenoController {
         this.service = service;
     }
 
+    @GetMapping
+    @Operation(summary = "Listar todos los grupos electrógenos", description = "Devuelve una lista paginada de todos los grupos electrógenos")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista obtenida exitosamente")
+    })
+    public ResponseEntity<PaginatedResponseDTO<GrupoElectrogenoResponseDTO>> listarTodos(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false, defaultValue = "id,asc") String sort) {
+
+        Sort.Direction direction = sort.toLowerCase().endsWith("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+        String sortProp = sort.contains(",") ? sort.split(",")[0] : sort;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortProp));
+
+        PaginatedResponseDTO<GrupoElectrogenoResponseDTO> resultado = service.listarPaginado(pageable);
+        return ResponseEntity.ok(resultado);
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Crear grupo electrógeno", description = "Añade un nuevo grupo electrógeno al inventario. Requiere ROLE_ADMIN.")
@@ -77,6 +95,19 @@ public class GrupoElectrogenoController {
     public ResponseEntity<Void> eliminarGrupo(@PathVariable Long id) {
         service.eliminarGrupo(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/stock")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Actualizar stock", description = "Actualiza el stock disponible de un grupo. Requiere ROLE_ADMIN.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Stock actualizado exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Grupo no encontrado")
+    })
+    public ResponseEntity<GrupoElectrogenoResponseDTO> actualizarStock(
+            @PathVariable Long id,
+            @RequestParam Integer nuevoStock) {
+        return ResponseEntity.ok(service.actualizarStock(id, nuevoStock));
     }
 
     @GetMapping("/{id}/precio")
