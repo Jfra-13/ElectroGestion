@@ -31,4 +31,10 @@ public interface GrupoElectrogenoService {
     // Devolvemos DTOs específicos porque el RF07 pide estrictamente "una lista con el código y la vida útil"
     List<GrupoMovilResumenDTO> buscarMovilesPorEje(MaterialEje material);
     PaginatedResponseDTO<GrupoMovilResumenDTO> buscarMovilesPorEjePaginado(MaterialEje material, Pageable pageable);
+
+    // Nuevo: listar todos paginado
+    PaginatedResponseDTO<GrupoElectrogenoResponseDTO> listarPaginado(Pageable pageable);
+
+    // Nuevo: actualizar stock
+    GrupoElectrogenoResponseDTO actualizarStock(Long id, Integer nuevoStock);
 }

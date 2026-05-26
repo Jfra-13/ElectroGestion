@@ -136,4 +136,27 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
         return new PaginatedResponseDTO<>(content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
 
+    @Override
+    public PaginatedResponseDTO<GrupoElectrogenoResponseDTO> listarPaginado(Pageable pageable) {
+        Page<GrupoElectrogeno> page = repository.findAll(pageable);
+        List<GrupoElectrogenoResponseDTO> content = page.stream()
+                .map(grupo -> mapper.toResponse(grupo, calcularPrecioVenta(grupo)))
+                .collect(Collectors.toList());
+
+        return new PaginatedResponseDTO<>(content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
+    }
+
+    @Override
+    @Transactional
+    public GrupoElectrogenoResponseDTO actualizarStock(Long id, Integer nuevoStock) {
+        if (nuevoStock == null || nuevoStock < 0) {
+            throw new IllegalArgumentException("El stock no puede ser nulo o negativo");
+        }
+        GrupoElectrogeno grupo = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo Electrógeno no encontrado con ID: " + id));
+        grupo.setStock(nuevoStock);
+        GrupoElectrogeno actualizado = repository.save(grupo);
+        return mapper.toResponse(actualizado, calcularPrecioVenta(actualizado));
+    }
+
 }
