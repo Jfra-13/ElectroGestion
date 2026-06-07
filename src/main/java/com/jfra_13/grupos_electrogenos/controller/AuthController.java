@@ -76,14 +76,13 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Error: El nombre de usuario ya existe.");
         }
 
+        // El registro público SIEMPRE asigna el rol mínimo (ROLE_USER).
+        // Nunca acepta roles provistos por el cliente: la creación de administradores
+        // se hace solo por un canal protegido o por bootstrap controlado.
+        Role userRole = roleRepository.findByNombre("ROLE_USER")
+                .orElseThrow(() -> new IllegalStateException("ROLE_USER no está inicializado en el sistema."));
         Set<Role> roles = new HashSet<>();
-        if (registerRequest.getRoles() == null || registerRequest.getRoles().isEmpty()) {
-            roleRepository.findByNombre("ROLE_USER").ifPresent(roles::add);
-        } else {
-            registerRequest.getRoles().forEach(role -> {
-                roleRepository.findByNombre(role).ifPresent(roles::add);
-            });
-        }
+        roles.add(userRole);
 
         Usuario usuario = Usuario.builder()
                 .username(registerRequest.getUsername())
