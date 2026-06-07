@@ -46,9 +46,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        // Catálogo de productos: lectura pública permitida.
                         .requestMatchers(HttpMethod.GET, "/api/v1/grupos-electrogenos/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes-compra/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/ventas/**").permitAll()
+                        // Ventas, recaudación y reportes: NUNCA públicos. Requieren autenticación.
+                        // El rol concreto (ADMIN para reportes financieros) se exige por método con @PreAuthorize.
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/h2-console").permitAll()
                         .anyRequest().authenticated()
