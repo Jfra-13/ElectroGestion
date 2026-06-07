@@ -72,13 +72,28 @@ public class SolicitudCompraControllerTest {
     }
 
     @Test
-    @WithMockUser
-    @DisplayName("Debe retornar los ingresos totales")
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("Debe retornar los ingresos totales para un ADMIN")
     void testGetIngresosTotales() throws Exception {
         when(service.calcularIngresosTotales()).thenReturn(5000.0);
 
         mockMvc.perform(get("/api/v1/ventas/ingresos-totales"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalRecaudado").value(5000.0));
+    }
+
+    @Test
+    @DisplayName("I2: debe rechazar ingresos-totales sin autenticación")
+    void testIngresosTotalesSinAuthRechazado() throws Exception {
+        mockMvc.perform(get("/api/v1/ventas/ingresos-totales"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    @DisplayName("I2: debe rechazar ingresos-totales con rol insuficiente (USER)")
+    void testIngresosTotalesRolInsuficiente() throws Exception {
+        mockMvc.perform(get("/api/v1/ventas/ingresos-totales"))
+                .andExpect(status().isForbidden());
     }
 }

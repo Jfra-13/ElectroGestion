@@ -72,7 +72,8 @@ public class SolicitudCompraController {
     }
 
     @GetMapping("/ranking-clientes")
-    @Operation(summary = "Ranking de clientes", description = "Lista los clientes con más compras realizadas")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Ranking de clientes", description = "Lista los clientes con más compras realizadas. Requiere ROLE_ADMIN.")
     public ResponseEntity<List<RankingEntidadDTO>> getRankingClientes() {
         return ResponseEntity.ok(service.obtenerRankingClientes());
     }
@@ -93,13 +94,15 @@ public class SolicitudCompraController {
     }
 
     @GetMapping("/reporte-pagos")
-    @Operation(summary = "Reporte por tipo de pago", description = "Lista ventas filtradas por el método de pago")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Reporte por tipo de pago", description = "Lista ventas filtradas por el método de pago. Requiere ROLE_ADMIN.")
     public ResponseEntity<List<ReportePagoDTO>> getReportePagos(@RequestParam TipoPago tipo) {
         return ResponseEntity.ok(service.obtenerReportePorPago(tipo));
     }
 
     @GetMapping("/ingresos-totales")
-    @Operation(summary = "Ingresos totales", description = "Calcula la suma total de todas las ventas")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Ingresos totales", description = "Calcula la suma total de todas las ventas. Requiere ROLE_ADMIN.")
     public ResponseEntity<Map<String, Double>> getIngresosTotales() {
         Double total = service.calcularIngresosTotales();
 
