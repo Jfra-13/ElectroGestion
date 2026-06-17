@@ -6,39 +6,33 @@
 
 ## Resumen
 
-Son **4 fases** (cubren los 8 indispensables). Estado: **7/8 — falta solo la Fase 4.**
+Son **4 fases** (cubren los 8 indispensables). Estado: **8/8 — completo.**
 
 ```
 Fase 1  Seguridad de acceso     [x] I1  [x] I2  [x] I3
 Fase 2  Esquema y arranque      [x] I6  [x] I7
 Fase 3  Integridad de ventas    [x] I4  [x] I5
-Fase 4  Robustez                [ ] I8        <-- ÚNICO PENDIENTE
+Fase 4  Robustez                [x] I8
 ```
 
 Último commit: `feat(backend): endurecimiento prod fases 1-3`.
-Suite local: **42 tests verdes** (excluyendo el de Testcontainers, ver abajo).
+Suite local: **43 tests verdes** (excluyendo el de Testcontainers, ver abajo).
 
 ---
 
-## Lo que falta para "PRODUCCIÓN READY"
+## Lo hecho en Fase 4 / I8 — Handler genérico de excepciones
 
-### 1. Fase 4 / I8 — Handler genérico de excepciones (BLOQUEANTE)
-
-Único indispensable abierto.
-
-- **Problema:** `GlobalExceptionHandler` no captura `Exception` genérica → un error
-  inesperado devuelve el 500 por defecto de Spring con stack trace (filtra rutas,
+- **Problema:** `GlobalExceptionHandler` no capturaba `Exception` genérica → un error
+  inesperado devolvía el 500 por defecto de Spring con stack trace (filtra rutas,
   librerías, a veces datos).
-- **Acción:**
-  - Agregar `@ExceptionHandler(Exception.class)` que responda un error genérico y
-    controlado (sin stack trace).
-  - Loguear el detalle completo solo en el servidor.
+- **Solución:** `@ExceptionHandler(Exception.class)` que responde un error genérico
+  controlado (sin stack trace); el detalle completo se loguea solo en el servidor.
 - **Archivo:** `src/main/java/.../exception/GlobalExceptionHandler.java`.
-- **Criterio de aceptación:** test que fuerza una excepción no mapeada → respuesta
-  genérica (sin stack trace en el body); el detalle aparece en logs.
+- **Test:** `GlobalExceptionHandlerTest` fuerza una excepción no mapeada → 500 con
+  body genérico (sin stack trace ni detalle interno); verifica que el detalle queda
+  en el log del servidor vía `ListAppender`.
 
-Con esto cerrado, las 8 casillas quedan marcadas y la etiqueta "PRODUCCIÓN READY"
-deja de ser falsa.
+Las 8 casillas quedan marcadas. La etiqueta "PRODUCCIÓN READY" ya no es falsa.
 
 ---
 
