@@ -10,13 +10,21 @@ import org.mapstruct.InheritConfiguration;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ObjectFactory;
 
 @Mapper(componentModel = "spring")
 public interface GrupoElectrogenoMapper {
 
+    @Mapping(target = "stock", source = "stock", defaultValue = "0")
+    @Mapping(target = "version", ignore = true)
     GrupoElectrogeno toEntity(GrupoElectrogenoRequestDTO dto);
 
+    // En update no se gestiona stock: si el DTO no lo trae, se conserva el actual
+    // (el stock se mueve por ventas y por el endpoint dedicado actualizarStock).
+    @Mapping(target = "stock", source = "stock",
+            nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "version", ignore = true)
     void updateEntity(GrupoElectrogenoRequestDTO dto, @MappingTarget GrupoElectrogeno entity);
 
     @Mapping(target = "potenciaMedia", expression = "java(calcularPotenciaMedia(entity.getPMin(), entity.getPMax()))")

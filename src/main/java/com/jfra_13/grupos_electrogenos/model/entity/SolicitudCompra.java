@@ -55,6 +55,15 @@ public class SolicitudCompra {
     @NotNull
     private Integer vidaUtilSolicitada;
 
+    // Precio unitario CONGELADO al momento de la venta. No se recalcula desde el
+    // grupo en cada lectura: así editar un grupo no altera la recaudación histórica.
+    @Column(nullable = false, updatable = false)
+    private Double precioUnitario;
+
+    // Total de la venta (precioUnitario * cantidad) persistido al crear/editar.
+    @Column(nullable = false)
+    private Double total;
+
     // Relación: Muchas solicitudes pueden pertenecer a una misma Entidad
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entidad_id", nullable = false)

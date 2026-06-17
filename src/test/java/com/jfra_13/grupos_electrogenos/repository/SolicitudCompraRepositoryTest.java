@@ -47,6 +47,8 @@ class SolicitudCompraRepositoryTest {
         s1.setVidaUtilSolicitada(5);
         s1.setEntidad(e);
         s1.setGrupoElectrogeno(g);
+        s1.setPrecioUnitario(150.0); // precio/total congelados (columnas NOT NULL)
+        s1.setTotal(150.0);
         solicitudRepository.save(s1);
 
         SolicitudCompra s2 = new SolicitudCompra();
@@ -59,6 +61,8 @@ class SolicitudCompraRepositoryTest {
         s2.setVidaUtilSolicitada(5);
         s2.setEntidad(e);
         s2.setGrupoElectrogeno(g);
+        s2.setPrecioUnitario(150.0);
+        s2.setTotal(150.0);
 
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> {
             solicitudRepository.save(s2);

@@ -60,6 +60,12 @@ public class GrupoElectrogeno {
     @Column(nullable = false)
     private Integer stock = 0;  // Stock disponible
 
+    // Control de concurrencia optimista: evita lost updates al descontar stock
+    // desde ventas simultáneas (ver SolicitudCompra: validación/descuento de stock).
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

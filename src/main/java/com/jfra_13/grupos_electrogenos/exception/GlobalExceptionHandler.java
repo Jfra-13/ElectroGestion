@@ -48,6 +48,11 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(mensaje, HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(StockInsuficienteException.class)
+    public ResponseEntity<Map<String, Object>> handleStockInsuficienteException(StockInsuficienteException ex) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDeniedException(AccessDeniedException ex) {
         return buildErrorResponse("Acceso denegado: No tiene permisos para realizar esta acción.", HttpStatus.FORBIDDEN);

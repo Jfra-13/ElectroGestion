@@ -1,6 +1,7 @@
 package com.jfra_13.grupos_electrogenos.service.impl;
 
 import com.jfra_13.grupos_electrogenos.exception.ResourceNotFoundException;
+import com.jfra_13.grupos_electrogenos.exception.StockInsuficienteException;
 import com.jfra_13.grupos_electrogenos.model.dto.RankingEntidadDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.ReportePagoDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
@@ -60,17 +61,32 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró un Grupo Electrógeno que cumpla con la potencia requerida para este combustible"));
 
+        // I5: validar disponibilidad y descontar stock (rechaza si no alcanza).
+        // El grupo está gestionado en esta transacción; @Version evita lost updates concurrentes.
+        int disponible = grupoSeleccionado.getStock() != null ? grupoSeleccionado.getStock() : 0;
+        if (disponible < dto.getCantidad()) {
+            throw new StockInsuficienteException(
+                    "Stock insuficiente para el grupo " + grupoSeleccionado.getCodigo()
+                            + ": disponible " + disponible + ", solicitado " + dto.getCantidad());
+        }
+        grupoSeleccionado.setStock(disponible - dto.getCantidad());
+
         SolicitudCompra solicitud = mapper.toEntity(dto, entidad, grupoSeleccionado, UUID.randomUUID().toString().substring(0, 8));
 
+        // I4: congelar precio unitario y total al momento de la venta.
+        double unitario = grupoService.calcularPrecioVenta(grupoSeleccionado);
+        solicitud.setPrecioUnitario(unitario);
+        solicitud.setTotal(unitario * dto.getCantidad());
+
         SolicitudCompra guardada = repository.save(solicitud);
-        return mapper.toResponse(guardada, grupoService.calcularPrecioVenta(guardada.getGrupoElectrogeno()));
+        return mapper.toResponse(guardada);
     }
 
     @Override
     public SolicitudCompraResponseDTO obtenerPorId(Long id) {
         SolicitudCompra entidad = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitud de compra no encontrada"));
-        return mapper.toResponse(entidad, grupoService.calcularPrecioVenta(entidad.getGrupoElectrogeno()));
+        return mapper.toResponse(entidad);
     }
 
     @Override
@@ -97,8 +113,15 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
 
         mapper.updateEntity(dto, entidad, existing.getGrupoElectrogeno(), existing);
 
+        // El precio unitario queda CONGELADO desde la creación; solo se recalcula el
+        // total si cambió la cantidad. (Fallback para filas legacy sin precio congelado.)
+        if (existing.getPrecioUnitario() == null) {
+            existing.setPrecioUnitario(grupoService.calcularPrecioVenta(existing.getGrupoElectrogeno()));
+        }
+        existing.setTotal(existing.getPrecioUnitario() * existing.getCantidad());
+
         SolicitudCompra actualizada = repository.save(existing);
-        return mapper.toResponse(actualizada, grupoService.calcularPrecioVenta(actualizada.getGrupoElectrogeno()));
+        return mapper.toResponse(actualizada);
     }
 
     @Override
@@ -122,8 +145,9 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
 
     @Override
     public Double calcularIngresosTotales() {
+        // I4: se suman los totales CONGELADOS de cada venta; no se recalcula desde el grupo.
         return repository.findAll().stream()
-                .mapToDouble(venta -> grupoService.calcularPrecioVenta(venta.getGrupoElectrogeno()) * venta.getCantidad())
+                .mapToDouble(venta -> venta.getTotal() != null ? venta.getTotal() : 0.0)
                 .sum();
     }
 
@@ -131,7 +155,7 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
     public PaginatedResponseDTO<SolicitudCompraResponseDTO> listarVentasPaginado(Pageable pageable) {
         Page<SolicitudCompra> page = repository.findAll(pageable);
         List<SolicitudCompraResponseDTO> content = page.stream()
-                .map(venta -> mapper.toResponse(venta, grupoService.calcularPrecioVenta(venta.getGrupoElectrogeno())))
+                .map(mapper::toResponse)
                 .collect(Collectors.toList());
 
         return new PaginatedResponseDTO<>(content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());

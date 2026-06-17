@@ -178,17 +178,17 @@ admin sin depender del registro público.
 
 ```
 Fase 1 — Seguridad
-[ ] I1  Registro público no asigna roles; admin solo por canal protegido
-[ ] I2  Endpoints financieros/clientes detrás de auth + rol
-[ ] I3  Sin defaults de JWT secret ni DB password en prod (fail-fast)
+[x] I1  Registro público no asigna roles; admin solo por canal protegido
+[x] I2  Endpoints financieros/clientes detrás de auth + rol
+[x] I3  Sin defaults de JWT secret ni DB password en prod (fail-fast)
 
 Fase 2 — Esquema y arranque
-[ ] I6  Migraciones Flyway/Liquibase creando el esquema
-[ ] I7  Roles + primer admin sembrados en prod
+[x] I6  Migraciones Flyway/Liquibase creando el esquema
+[x] I7  Roles + primer admin sembrados en prod
 
 Fase 3 — Integridad de datos
-[ ] I4  Venta guarda precio unitario y total inmutables
-[ ] I5  Stock se descuenta/valida en la venta (o se elimina el concepto)
+[x] I4  Venta guarda precio unitario y total inmutables
+[x] I5  Stock se descuenta/valida en la venta (o se elimina el concepto)
 
 Fase 4 — Robustez
 [ ] I8  Handler genérico de Exception sin filtrar stack traces

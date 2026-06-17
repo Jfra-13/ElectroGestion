@@ -45,19 +45,15 @@ public class SolicitudCompraServiceTest {
     }
 
     @Test
-    void debeCalcularIngresosTotalesCorrectamente() {
-        // Arrange
-        GrupoElectrogeno g1 = new GrupoElectrogeno();
-        g1.setVidaUtil(10);
-        g1.setPMin(100.0);
-        g1.setPMax(200.0);
-
+    void debeCalcularIngresosTotalesDesdeTotalesCongelados() {
+        // I4: los ingresos suman el total CONGELADO de cada venta, NO recalculan
+        // desde el grupo actual (editar el grupo no debe alterar la recaudación).
         SolicitudCompra s1 = new SolicitudCompra();
         s1.setCantidad(2);
-        s1.setGrupoElectrogeno(g1);
+        s1.setPrecioUnitario(1000.0);
+        s1.setTotal(2000.0);
 
         when(repository.findAll()).thenReturn(Collections.singletonList(s1));
-        when(grupoService.calcularPrecioVenta(g1)).thenReturn(1000.0);
 
         // Act
         Double total = service.calcularIngresosTotales();
@@ -65,7 +61,7 @@ public class SolicitudCompraServiceTest {
         // Assert
         assertEquals(2000.0, total);
         verify(repository).findAll();
-        verify(grupoService).calcularPrecioVenta(g1);
+        verifyNoInteractions(grupoService);
     }
 
     @Test

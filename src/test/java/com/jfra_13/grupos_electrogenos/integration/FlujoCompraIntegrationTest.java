@@ -51,6 +51,7 @@ public class FlujoCompraIntegrationTest {
                 .pMin(100.0)
                 .pMax(500.0)
                 .esMovil(false)
+                .stock(5) // I5: la venta valida/descuenta stock; sin stock la venta se rechaza
                 .build();
 
         mockMvc.perform(post("/api/v1/grupos-electrogenos")

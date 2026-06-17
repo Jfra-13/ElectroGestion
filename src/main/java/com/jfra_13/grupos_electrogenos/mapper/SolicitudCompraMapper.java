@@ -22,6 +22,8 @@ public interface SolicitudCompraMapper {
     @Mapping(target = "vidaUtilSolicitada", source = "dto.vidaUtilSolicitada")
     @Mapping(target = "entidad", source = "entidad")
     @Mapping(target = "grupoElectrogeno", source = "grupoElectrogeno")
+    @Mapping(target = "precioUnitario", ignore = true)
+    @Mapping(target = "total", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     SolicitudCompra toEntity(SolicitudCompraRequestDTO dto, Entidad entidad, GrupoElectrogeno grupoElectrogeno, String identificador);
@@ -36,15 +38,19 @@ public interface SolicitudCompraMapper {
     @Mapping(target = "vidaUtilSolicitada", source = "dto.vidaUtilSolicitada")
     @Mapping(target = "entidad", source = "entidad")
     @Mapping(target = "grupoElectrogeno", source = "grupoElectrogeno")
+    @Mapping(target = "precioUnitario", ignore = true)
+    @Mapping(target = "total", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateEntity(SolicitudCompraRequestDTO dto, Entidad entidad, GrupoElectrogeno grupoElectrogeno, @MappingTarget SolicitudCompra entity);
 
-    @Mapping(target = "entidadId", source = "entity.entidad.id")
-    @Mapping(target = "entidadNombre", source = "entity.entidad.nombre")
-    @Mapping(target = "grupoId", source = "entity.grupoElectrogeno.id")
-    @Mapping(target = "grupoCodigo", source = "entity.grupoElectrogeno.codigo")
-    @Mapping(target = "precioVentaUnitario", source = "precioVentaUnitario")
-    SolicitudCompraResponseDTO toResponse(SolicitudCompra entity, Double precioVentaUnitario);
+    // El response lee el precio/total CONGELADOS en la entidad; no recalcula desde el grupo.
+    @Mapping(target = "entidadId", source = "entidad.id")
+    @Mapping(target = "entidadNombre", source = "entidad.nombre")
+    @Mapping(target = "grupoId", source = "grupoElectrogeno.id")
+    @Mapping(target = "grupoCodigo", source = "grupoElectrogeno.codigo")
+    @Mapping(target = "precioVentaUnitario", source = "precioUnitario")
+    @Mapping(target = "total", source = "total")
+    SolicitudCompraResponseDTO toResponse(SolicitudCompra entity);
 }
 

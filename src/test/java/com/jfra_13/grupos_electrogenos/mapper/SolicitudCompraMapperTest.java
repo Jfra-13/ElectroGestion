@@ -63,8 +63,11 @@ class SolicitudCompraMapperTest {
         entity.setVidaUtilSolicitada(6);
         entity.setEntidad(entidad);
         entity.setGrupoElectrogeno(grupo);
+        // Precio/total congelados en la entidad: el response los lee tal cual.
+        entity.setPrecioUnitario(777.0);
+        entity.setTotal(2331.0);
 
-        SolicitudCompraResponseDTO dto = mapper.toResponse(entity, 777.0);
+        SolicitudCompraResponseDTO dto = mapper.toResponse(entity);
 
         assertThat(dto.getId()).isEqualTo(9L);
         assertThat(dto.getEntidadId()).isEqualTo(1L);
@@ -72,6 +75,7 @@ class SolicitudCompraMapperTest {
         assertThat(dto.getGrupoId()).isEqualTo(2L);
         assertThat(dto.getGrupoCodigo()).isEqualTo("G-1");
         assertThat(dto.getPrecioVentaUnitario()).isEqualTo(777.0);
+        assertThat(dto.getTotal()).isEqualTo(2331.0);
     }
 }
 
