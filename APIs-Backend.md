@@ -4,7 +4,8 @@ Documentación técnica completa del backend **Grupos Electrógenos**. Pensada p
 el equipo de frontend conecte sin tener que volver a preguntar al backend: cada
 endpoint trae método, ruta, permisos, parámetros, JSON de request y JSON de respuesta.
 
-> Última actualización: refleja el código en `main` (backend prod-ready, 8/8 indispensables).
+> Última actualización: refleja el código en `main` (backend prod-ready, 8/8 indispensables
+> + gestión de empleados y ventas por vendedor).
 
 ---
 
@@ -67,9 +68,16 @@ credenciales NO existen en prod.
 
 ### Roles
 
-- `ROLE_USER` — usuario estándar (lo que asigna el registro público).
-- `ROLE_ADMIN` — administrador. Requerido para crear/editar/borrar y para los
-  reportes financieros.
+- `ROLE_USER` — usuario estándar (lo que asigna el registro público `/auth/register`).
+  No puede operar ventas ni reportes.
+- `ROLE_EMPLEADO` — vendedor. Puede registrar ventas y ver **solo las suyas**. No
+  accede a reportes financieros ni a la gestión de usuarios. Se crea solo por el
+  canal protegido (`POST /api/v1/usuarios`, lo hace un admin).
+- `ROLE_ADMIN` — administrador ("jefe"). Crea/edita/borra, ve todas las ventas,
+  filtra por empleado, accede a reportes financieros y crea usuarios.
+
+> El JWT incluye el claim `roles`, así el front puede mostrar/ocultar vistas según
+> el rol sin volver a pegarle al backend.
 
 ---
 
@@ -166,6 +174,7 @@ Mandar un valor fuera de esta lista devuelve `400` con mensaje de formato.
 Leyenda de permisos:
 - 🔓 **Público** — sin token.
 - 🔐 **Autenticado** — requiere token válido (cualquier rol).
+- 🟩 **ADMIN o EMPLEADO** — requiere `ROLE_ADMIN` o `ROLE_EMPLEADO`.
 - 🔒 **ADMIN** — requiere token con `ROLE_ADMIN`.
 
 ### 4.1 Autenticación — `/api/v1/auth`
@@ -219,7 +228,70 @@ ya está tomado.
 
 ---
 
-### 4.2 Grupos Electrógenos — `/api/v1/grupos-electrogenos`
+### 4.2 Usuarios (Gestión de empleados) — `/api/v1/usuarios`
+
+> Todo este recurso requiere `ROLE_ADMIN`. Es el canal protegido para que el jefe
+> dé de alta empleados/administradores (a diferencia de `/auth/register`, que es
+> público y siempre crea `ROLE_USER`).
+
+#### 🔒 POST `/api/v1/usuarios`  *(ADMIN)*
+
+Crea un usuario con el rol elegido.
+
+**Request:**
+```json
+{
+  "username": "vendedor1",
+  "password": "claveSegura8+",
+  "email": "vendedor1@empresa.com",
+  "rol": "EMPLEADO"
+}
+```
+
+**Campos y validación:**
+
+| Campo | Tipo | Obligatorio | Regla |
+|-------|------|-------------|-------|
+| `username` | string | ✅ | no vacío, único |
+| `password` | string | ✅ | mínimo 8 caracteres |
+| `email` | string | ✅ | formato email, único |
+| `rol` | enum | ✅ | `EMPLEADO` o `ADMIN` (cualquier otro valor → `400`) |
+
+> El `rol` se manda **sin** el prefijo `ROLE_`. Valores válidos: `EMPLEADO`, `ADMIN`.
+> No se puede crear `USER` por acá (ese rol es solo del registro público).
+
+**Response `201`:**
+```json
+{
+  "id": 5,
+  "username": "vendedor1",
+  "email": "vendedor1@empresa.com",
+  "roles": ["ROLE_EMPLEADO"]
+}
+```
+
+**Errores:** `400` si el username o el email ya existen, o si el rol/datos son
+inválidos; `403` sin rol admin.
+
+---
+
+#### 🔒 GET `/api/v1/usuarios`  *(ADMIN)*
+
+Lista todos los usuarios del sistema (para la pantalla de gestión de empleados).
+
+**Response `200`:**
+```json
+[
+  { "id": 1, "username": "admin", "email": "admin@empresa.com", "roles": ["ROLE_ADMIN"] },
+  { "id": 5, "username": "vendedor1", "email": "vendedor1@empresa.com", "roles": ["ROLE_EMPLEADO"] }
+]
+```
+
+**Errores:** `403` sin rol admin. La contraseña **nunca** se devuelve.
+
+---
+
+### 4.3 Grupos Electrógenos — `/api/v1/grupos-electrogenos`
 
 > Los `GET` de este recurso son **públicos** (catálogo). El resto requiere `ROLE_ADMIN`.
 
@@ -404,15 +476,20 @@ Actualiza el stock disponible. El nuevo stock va como **query param**, no en el 
 
 ---
 
-### 4.3 Ventas (Solicitudes de Compra) — `/api/v1/ventas`
+### 4.4 Ventas (Solicitudes de Compra) — `/api/v1/ventas`
 
 > ⚠️ **Ningún endpoint de ventas es público.** Como mínimo requieren token
 > (autenticado). Los reportes financieros requieren `ROLE_ADMIN`.
+>
+> 🧭 **Filtrado por rol:** un `EMPLEADO` solo ve y opera **sus propias** ventas; un
+> `ADMIN` ve todas y puede filtrar por empleado. La venta queda atribuida al usuario
+> autenticado (campos `vendedorId` / `vendedorUsername` en la respuesta).
 
-#### 🔒 POST `/api/v1/ventas`  *(ADMIN)*
+#### 🟩 POST `/api/v1/ventas`  *(ADMIN o EMPLEADO)*
 
-Registra una venta. El backend valida y descuenta stock, y **congela** el precio
-unitario y el total al momento de la venta.
+Registra una venta. El backend valida y descuenta stock, **congela** el precio
+unitario y el total, y **atribuye la venta al usuario autenticado** (no se puede
+indicar el vendedor en el request).
 
 **Request:**
 ```json
@@ -455,26 +532,50 @@ unitario y el total al momento de la venta.
   "grupoId": 1,
   "grupoCodigo": "FJO-001",
   "precioVentaUnitario": 1500.0,
-  "total": 3000.0
+  "total": 3000.0,
+  "vendedorId": 5,
+  "vendedorUsername": "vendedor1"
 }
 ```
 
+> `vendedorId` / `vendedorUsername` identifican quién hizo la venta. En ventas
+> legacy (previas a esta función) pueden venir `null`.
+
 **Errores:** `400` validación, `409` si no hay stock suficiente
-(`Stock insuficiente...`), `403` sin rol admin, `404` si la entidad/grupo no existe.
+(`Stock insuficiente...`), `403` sin rol (ni admin ni empleado), `404` si la
+entidad/grupo no existe.
 
 ---
 
-#### 🔐 GET `/api/v1/ventas`  *(Autenticado)*
+#### 🔐 GET `/api/v1/ventas`  *(Autenticado — filtra por rol)*
 
-Lista paginada de ventas. Sort por defecto: `id,asc`. Requiere token (cualquier rol).
+Lista paginada de ventas. Sort por defecto: `id,asc`.
 
-**Response `200`:** objeto paginado de ventas (forma `SolicitudCompraResponseDTO`).
+- **EMPLEADO** → ve **solo sus** ventas. Cualquier `vendedorId` que mande se ignora.
+- **ADMIN** → ve **todas**, o las de un empleado puntual con el query param opcional
+  `vendedorId`.
+
+**Query params:** `page`, `size`, `sort`, y `vendedorId` (long, opcional, **solo
+aplica para ADMIN**).
+
+Ejemplo (jefe viendo las ventas del empleado 5):
+`GET /api/v1/ventas?vendedorId=5&page=0&size=20`
+
+**Response `200`:** objeto paginado de ventas (forma `SolicitudCompraResponseDTO`,
+incluye `vendedorId` / `vendedorUsername`).
 
 ---
 
-#### 🔐 GET `/api/v1/ventas/{id}`  *(Autenticado)*
+#### 🔐 GET `/api/v1/ventas/{id}`  *(Autenticado — filtra por rol)*
 
-Detalle de una venta. **Response `200`:** objeto venta. **Errores:** `404`.
+Detalle de una venta.
+
+- **EMPLEADO** → solo puede ver **su propia** venta. Si pide una ajena, recibe `404`
+  (no se revela que existe).
+- **ADMIN** → cualquier venta.
+
+**Response `200`:** objeto venta. **Errores:** `404` si no existe, o si un empleado
+pide una venta que no es suya.
 
 ---
 
@@ -487,6 +588,24 @@ Actualiza una venta. Mismo body que POST. **Response `200`:** venta actualizada.
 #### 🔒 DELETE `/api/v1/ventas/{id}`  *(ADMIN)*
 
 Borra una venta. **Response `204`** (sin cuerpo).
+
+---
+
+#### 🔒 GET `/api/v1/ventas/por-empleado`  *(ADMIN)*
+
+Ranking de ventas por empleado (vista del jefe): cantidad de ventas y total
+recaudado por cada vendedor, ordenado por recaudación descendente. Solo incluye
+ventas con vendedor asignado.
+
+**Response `200`:**
+```json
+[
+  { "vendedor": "vendedor1", "cantidadVentas": 8, "totalRecaudado": 24000.0 },
+  { "vendedor": "vendedor2", "cantidadVentas": 3, "totalRecaudado": 9000.0 }
+]
+```
+
+**Errores:** `403` sin rol admin.
 
 ---
 
@@ -578,7 +697,9 @@ async function apiFetch(path, options = {}) {
 | Método | Ruta | Permiso | Descripción |
 |--------|------|---------|-------------|
 | POST | `/api/v1/auth/login` | 🔓 | Login → token JWT |
-| POST | `/api/v1/auth/register` | 🔓 | Registro (rol USER) |
+| POST | `/api/v1/auth/register` | 🔓 | Registro público (rol USER) |
+| POST | `/api/v1/usuarios` | 🔒 ADMIN | Crear empleado/admin |
+| GET | `/api/v1/usuarios` | 🔒 ADMIN | Listar usuarios |
 | GET | `/api/v1/grupos-electrogenos` | 🔓 | Listar grupos (paginado) |
 | GET | `/api/v1/grupos-electrogenos/{id}` | 🔓 | Detalle de grupo |
 | GET | `/api/v1/grupos-electrogenos/{id}/precio` | 🔓 | Cotizar precio (número) |
@@ -588,11 +709,12 @@ async function apiFetch(path, options = {}) {
 | PUT | `/api/v1/grupos-electrogenos/{id}` | 🔒 ADMIN | Editar grupo |
 | DELETE | `/api/v1/grupos-electrogenos/{id}` | 🔒 ADMIN | Borrar grupo |
 | PATCH | `/api/v1/grupos-electrogenos/{id}/stock` | 🔒 ADMIN | Actualizar stock |
-| POST | `/api/v1/ventas` | 🔒 ADMIN | Registrar venta |
-| GET | `/api/v1/ventas` | 🔐 Auth | Listar ventas (paginado) |
-| GET | `/api/v1/ventas/{id}` | 🔐 Auth | Detalle de venta |
+| POST | `/api/v1/ventas` | 🟩 ADMIN/EMPLEADO | Registrar venta (atribuida al usuario) |
+| GET | `/api/v1/ventas` | 🔐 Auth | Listar ventas (empleado: solo suyas; admin: todas o `?vendedorId`) |
+| GET | `/api/v1/ventas/{id}` | 🔐 Auth | Detalle de venta (empleado: solo la suya) |
 | PUT | `/api/v1/ventas/{id}` | 🔒 ADMIN | Editar venta |
 | DELETE | `/api/v1/ventas/{id}` | 🔒 ADMIN | Borrar venta |
+| GET | `/api/v1/ventas/por-empleado` | 🔒 ADMIN | Ranking de ventas por empleado |
 | GET | `/api/v1/ventas/ranking-clientes` | 🔒 ADMIN | Ranking de clientes |
 | GET | `/api/v1/ventas/reporte-pagos` | 🔒 ADMIN | Reporte por tipo de pago |
 | GET | `/api/v1/ventas/ingresos-totales` | 🔒 ADMIN | Total recaudado |

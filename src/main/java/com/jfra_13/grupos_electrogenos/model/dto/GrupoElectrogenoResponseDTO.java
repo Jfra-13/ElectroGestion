@@ -1,5 +1,6 @@
 package com.jfra_13.grupos_electrogenos.model.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
@@ -18,7 +19,9 @@ public class GrupoElectrogenoResponseDTO {
     private Integer vidaUtil;
     private TipoCombustible tipoCombustible;
     private TipoArranque tipoArranque;
+    @JsonProperty("pMin")
     private Double pMin;
+    @JsonProperty("pMax")
     private Double pMax;
     private Boolean insonorizado;
     private Boolean capo;

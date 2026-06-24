@@ -3,6 +3,7 @@ package com.jfra_13.grupos_electrogenos.service;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.RankingEntidadDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.RankingVendedorDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.ReportePagoDTO;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
 import java.util.List;
@@ -19,6 +20,10 @@ public interface SolicitudCompraService {
     List<ReportePagoDTO> obtenerReportePorPago(TipoPago tipoPago);
     Double calcularIngresosTotales(); // RF06
 
-    // Listado paginado de ventas
-    PaginatedResponseDTO<SolicitudCompraResponseDTO> listarVentasPaginado(Pageable pageable);
+    // Ranking de ventas por empleado (vista del jefe).
+    List<RankingVendedorDTO> obtenerRankingVendedores();
+
+    // Listado paginado de ventas. Un EMPLEADO ve solo las suyas; un ADMIN ve
+    // todas, o las de un vendedor concreto si pasa vendedorId.
+    PaginatedResponseDTO<SolicitudCompraResponseDTO> listarVentasPaginado(Pageable pageable, Long vendedorId);
 }

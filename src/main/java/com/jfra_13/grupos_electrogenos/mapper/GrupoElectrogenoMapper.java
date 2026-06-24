@@ -27,6 +27,8 @@ public interface GrupoElectrogenoMapper {
     @Mapping(target = "version", ignore = true)
     void updateEntity(GrupoElectrogenoRequestDTO dto, @MappingTarget GrupoElectrogeno entity);
 
+    @Mapping(target = "pMin", source = "entity.PMin")
+    @Mapping(target = "pMax", source = "entity.PMax")
     @Mapping(target = "potenciaMedia", expression = "java(calcularPotenciaMedia(entity.getPMin(), entity.getPMax()))")
     @Mapping(target = "precioVentaCalculado", source = "precioVentaCalculado")
     @Mapping(target = "tipoGrupo", ignore = true)

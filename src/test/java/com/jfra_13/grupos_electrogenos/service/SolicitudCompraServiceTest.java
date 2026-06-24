@@ -10,6 +10,7 @@ import com.jfra_13.grupos_electrogenos.mapper.SolicitudCompraMapper;
 import com.jfra_13.grupos_electrogenos.repository.EntidadRepository;
 import com.jfra_13.grupos_electrogenos.repository.GrupoElectrogenoRepository;
 import com.jfra_13.grupos_electrogenos.repository.SolicitudCompraRepository;
+import com.jfra_13.grupos_electrogenos.repository.UsuarioRepository;
 import com.jfra_13.grupos_electrogenos.service.impl.SolicitudCompraServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,13 +36,15 @@ public class SolicitudCompraServiceTest {
     private EntidadRepository entidadRepository;
     @Mock
     private GrupoElectrogenoRepository grupoRepository;
+    @Mock
+    private UsuarioRepository usuarioRepository;
 
     private SolicitudCompraServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new SolicitudCompraServiceImpl(repository, grupoService, entidadRepository, grupoRepository,
-                Mappers.getMapper(SolicitudCompraMapper.class));
+                usuarioRepository, Mappers.getMapper(SolicitudCompraMapper.class));
     }
 
     @Test

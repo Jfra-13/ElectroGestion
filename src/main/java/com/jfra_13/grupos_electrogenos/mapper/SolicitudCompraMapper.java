@@ -24,6 +24,7 @@ public interface SolicitudCompraMapper {
     @Mapping(target = "grupoElectrogeno", source = "grupoElectrogeno")
     @Mapping(target = "precioUnitario", ignore = true)
     @Mapping(target = "total", ignore = true)
+    @Mapping(target = "vendedor", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     SolicitudCompra toEntity(SolicitudCompraRequestDTO dto, Entidad entidad, GrupoElectrogeno grupoElectrogeno, String identificador);
@@ -40,6 +41,7 @@ public interface SolicitudCompraMapper {
     @Mapping(target = "grupoElectrogeno", source = "grupoElectrogeno")
     @Mapping(target = "precioUnitario", ignore = true)
     @Mapping(target = "total", ignore = true)
+    @Mapping(target = "vendedor", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateEntity(SolicitudCompraRequestDTO dto, Entidad entidad, GrupoElectrogeno grupoElectrogeno, @MappingTarget SolicitudCompra entity);
@@ -51,6 +53,8 @@ public interface SolicitudCompraMapper {
     @Mapping(target = "grupoCodigo", source = "grupoElectrogeno.codigo")
     @Mapping(target = "precioVentaUnitario", source = "precioUnitario")
     @Mapping(target = "total", source = "total")
+    @Mapping(target = "vendedorId", source = "vendedor.id")
+    @Mapping(target = "vendedorUsername", source = "vendedor.username")
     SolicitudCompraResponseDTO toResponse(SolicitudCompra entity);
 }
 

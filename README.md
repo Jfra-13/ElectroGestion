@@ -1,52 +1,463 @@
 # Sistema de Gestión de Grupos Electrógenos
 
-Repositorio Sistema para la gestión de solicitudes de grupos electrógenos.
+API REST para la gestión de inventario, ventas y reportes financieros de grupos
+electrógenos. Backend construido con **Spring Boot 3.4 / Java 21**, con seguridad
+basada en **JWT**, persistencia **JPA/PostgreSQL**, migraciones versionadas con
+**Flyway** y documentación viva con **OpenAPI/Swagger**.
 
-## Tecnologías utilizadas
-- Java 21, Spring Boot 3.4
-- Spring Security + JWT
-- Spring Data JPA + PostgreSQL / H2
-- JaCoCo (Cobertura de Código)
-- SpringDoc OpenAPI (Swagger)
+> Este README documenta la **arquitectura, estructura y decisiones técnicas** del
+> proyecto. Para el contrato de cada endpoint (request/response JSON, permisos,
+> params) ver **[`API-FRONTEND.md`](APIs-Backend.md)**.
 
-## Guía de Inicio Rápido
+---
+
+## Tabla de contenidos
+
+1. [Dominio del problema](#1-dominio-del-problema)
+2. [Stack tecnológico](#2-stack-tecnológico)
+3. [Arquitectura aplicada](#3-arquitectura-aplicada)
+4. [Estructura de carpetas y archivos](#4-estructura-de-carpetas-y-archivos)
+5. [Modelo de datos](#5-modelo-de-datos)
+6. [Reglas de negocio clave](#6-reglas-de-negocio-clave)
+7. [Seguridad](#7-seguridad)
+8. [Manejo de errores](#8-manejo-de-errores)
+9. [Perfiles y configuración](#9-perfiles-y-configuración)
+10. [Migraciones de base de datos](#10-migraciones-de-base-de-datos)
+11. [Testing y cobertura](#11-testing-y-cobertura)
+12. [Cómo ejecutar](#12-cómo-ejecutar)
+13. [Decisiones técnicas destacadas](#13-decisiones-técnicas-destacadas)
+
+---
+
+## 1. Dominio del problema
+
+El sistema modela la venta de **grupos electrógenos** (generadores eléctricos). Hay
+dos tipos: **fijos** y **móviles** (estos últimos con ruedas y material de eje). El
+negocio expone un **catálogo** público de productos y una operatoria privada de
+**ventas** que valida stock, calcula precio y genera reportes financieros (ranking de
+clientes, reporte por tipo de pago, ingresos totales).
+
+Entidades centrales:
+
+- **GrupoElectrógeno** / **GrupoElectrógenoMóvil** — el producto (modelo + stock).
+- **SolicitudCompra** ("venta") — registro de una venta concreta.
+- **Entidad** — el cliente (empresa) que compra.
+- **Usuario** / **Role** — autenticación y autorización.
+
+---
+
+## 2. Stack tecnológico
+
+| Capa | Tecnología |
+|------|------------|
+| Lenguaje | Java 21 |
+| Framework | Spring Boot 3.4.3 |
+| Web | Spring Web (MVC, REST) |
+| Persistencia | Spring Data JPA + Hibernate |
+| Base de datos | PostgreSQL (prod) · H2 en memoria (dev/test) |
+| Migraciones | Flyway (solo prod sobre PostgreSQL) |
+| Seguridad | Spring Security + JJWT 0.11.5 (HS256) |
+| Mapeo DTO↔Entidad | MapStruct 1.6.3 |
+| Boilerplate | Lombok |
+| Validación | Bean Validation (Jakarta) |
+| Documentación API | springdoc-openapi (Swagger UI) 2.8.5 |
+| Cobertura | JaCoCo 0.8.12 |
+| Testing de integración | JUnit 5 + Spring Test + Testcontainers (PostgreSQL real) |
+
+Build: **Maven** (con wrapper `./mvnw`, no requiere Maven instalado).
+
+---
+
+## 3. Arquitectura aplicada
+
+### Arquitectura en capas (layered / N-tier)
+
+El backend sigue una separación estricta de responsabilidades. El flujo de una
+petición es siempre el mismo:
+
+```
+HTTP request
+   │
+   ▼
+Controller  ──►  Service (interfaz)  ──►  ServiceImpl (lógica de negocio)
+(REST, DTOs)        │                          │
+                    │                          ▼
+                    │                     Repository (Spring Data JPA)
+                    │                          │
+                    ▼                          ▼
+                  Mapper (MapStruct)        Base de datos
+                    │
+                    ▼
+            DTO de respuesta  ──►  HTTP response (JSON)
+```
+
+**Regla de oro del proyecto:** las entidades JPA **nunca** cruzan la frontera HTTP.
+El cliente solo ve DTOs. Esto desacopla el modelo de persistencia del contrato de la
+API: se puede cambiar la tabla sin romper el frontend, y se evita exponer campos
+internos (`version`, timestamps, relaciones lazy).
+
+### Patrones e ideas implementadas
+
+| Patrón / técnica | Dónde | Para qué |
+|------------------|-------|----------|
+| **Layered architecture** | controller / service / repository | Separación de responsabilidades |
+| **DTO pattern** | `model/dto/*` | Desacoplar API de entidades JPA |
+| **Mapper pattern** | `mapper/*` (MapStruct) | Conversión declarativa DTO↔entidad |
+| **Programación contra interfaces** | `service/*` + `service/impl/*` | Inversión de dependencias (DIP) |
+| **Inyección por constructor** | todos los componentes | Inmutabilidad y testabilidad |
+| **Repository pattern** | `repository/*` | Abstracción de acceso a datos |
+| **Herencia JPA (JOINED)** | `GrupoElectrogeno` → `GrupoElectrogenoMovil` | Modelar especialización con tablas separadas |
+| **Strategy de perfiles** | `application-{dev,prod,test}` | Comportamiento por entorno |
+| **Bloqueo optimista** | `@Version` en `GrupoElectrogeno` | Concurrencia segura al descontar stock |
+| **Global exception handling** | `@ControllerAdvice` | Errores consistentes y sin fugas |
+
+---
+
+## 4. Estructura de carpetas y archivos
+
+```
+src/main/java/com/jfra_13/grupos_electrogenos/
+├── GruposElectrogenosApplication.java   # Punto de entrada Spring Boot
+│
+├── config/
+│   └── OpenApiConfig.java               # Configura Swagger + esquema de seguridad bearer JWT
+│
+├── controller/                          # Capa REST. Solo orquesta: valida, delega, responde
+│   ├── AuthController.java              # /auth/login y /auth/register
+│   ├── GrupoElectrogenoController.java  # CRUD + filtros + cotización de catálogo
+│   └── SolicitudCompraController.java   # CRUD de ventas + reportes financieros
+│
+├── service/                             # Contratos de negocio (interfaces)
+│   ├── GrupoElectrogenoService.java
+│   ├── SolicitudCompraService.java
+│   └── impl/                            # Implementaciones (la lógica real vive acá)
+│       ├── GrupoElectrogenoServiceImpl.java
+│       └── SolicitudCompraServiceImpl.java
+│
+├── repository/                          # Spring Data JPA (interfaces, sin implementación manual)
+│   ├── GrupoElectrogenoRepository.java  # Queries JPQL custom (filtro por combustible / eje)
+│   ├── SolicitudCompraRepository.java   # Reportes con projections (ranking, por pago)
+│   ├── EntidadRepository.java
+│   ├── UsuarioRepository.java
+│   └── RoleRepository.java
+│
+├── mapper/                              # MapStruct: DTO ↔ entidad
+│   ├── GrupoElectrogenoMapper.java      # Maneja la herencia fijo/móvil + campos calculados
+│   └── SolicitudCompraMapper.java
+│
+├── model/
+│   ├── entity/                          # Entidades JPA (tablas)
+│   │   ├── GrupoElectrogeno.java        # Producto base
+│   │   ├── GrupoElectrogenoMovil.java   # Subclase (herencia JOINED)
+│   │   ├── SolicitudCompra.java         # Venta
+│   │   ├── Entidad.java                 # Cliente
+│   │   ├── Usuario.java / Role.java     # Seguridad (ManyToMany)
+│   ├── dto/                             # Objetos de transferencia (request/response)
+│   │   ├── *RequestDTO / *ResponseDTO
+│   │   ├── PaginatedResponseDTO.java    # Envoltorio de paginación genérico
+│   │   ├── RankingEntidadDTO / ReportePagoDTO  # Projections de reportes
+│   │   └── AuthResponseDTO / LoginRequestDTO / RegisterRequestDTO
+│   └── enums/                           # Valores cerrados del dominio
+│       ├── TipoCombustible.java         # NAFTA, GAS_NATURAL, GASOIL
+│       ├── TipoArranque.java            # AUTOMATICO, MANUAL
+│       ├── MaterialEje.java             # ACERO, ALEACION
+│       └── TipoPago.java                # CHEQUE, EFECTIVO
+│
+├── security/                            # Toda la infraestructura de autenticación/autorización
+│   ├── SecurityConfig.java              # Filter chain, CORS, reglas de acceso por ruta
+│   ├── JwtUtil.java                     # Genera/valida/parsea tokens JWT (HS256)
+│   ├── JwtAuthorizationFilter.java      # Filtro por request: lee Bearer y puebla el contexto
+│   ├── JpaUserDetailsService.java       # Carga usuario+roles desde la BD para Spring Security
+│   ├── DataInitializer.java             # Seed de roles + admin (solo dev/test)
+│   └── AdminBootstrap.java              # Seed del admin en prod (credenciales del entorno)
+│
+└── exception/
+    ├── GlobalExceptionHandler.java      # @ControllerAdvice: traduce excepciones a HTTP
+    ├── ResourceNotFoundException.java   # → 404
+    └── StockInsuficienteException.java  # → 409
+
+src/main/resources/
+├── application.properties               # Común (puerto 8082, perfil dev por defecto, JWT)
+├── application-dev.properties           # H2 en memoria, ddl-auto=update, datos de demo
+├── application-prod.properties          # PostgreSQL, ddl-auto=validate, Flyway ON, fail-fast
+├── application-test.properties          # H2 create-drop efímero
+├── data-entidades.sql                   # Datos semilla de entidades (dev/test)
+└── db/migration/                        # Migraciones Flyway (V1..V4) — solo prod
+
+src/test/java/...                        # 21 clases de test (unit + integración + Testcontainers)
+```
+
+---
+
+## 5. Modelo de datos
+
+### Herencia: fijo vs. móvil
+
+`GrupoElectrogeno` usa `@Inheritance(strategy = JOINED)`. Esto crea **dos tablas**:
+
+- `grupos_electrogenos` — campos comunes (código, potencias, combustible, stock…).
+- `grupos_electrogenos_moviles` — solo los campos extra del móvil (`cantidad_ruedas`,
+  `material_eje`), unidas por PK/FK compartida (`fk_movil_grupo`).
+
+Ventaja de JOINED: sin columnas nulas "basura" (a diferencia de SINGLE_TABLE) y
+normalización limpia. Costo: un JOIN al leer móviles (asumido, el volumen es bajo).
+
+### Entidades y relaciones
+
+```
+Usuario  ──< usuarios_roles >──  Role          (ManyToMany, EAGER)
+
+Entidad  1 ───< N  SolicitudCompra  N >─── 1  GrupoElectrogeno
+                       (venta)                  (producto)
+```
+
+- `SolicitudCompra → Entidad` y `SolicitudCompra → GrupoElectrogeno`: ambas
+  `@ManyToOne(fetch = LAZY)` para no traer datos que el caso de uso no pide.
+- Índices declarados en las entidades: por `tipoCombustible`, por `materialEje`, por
+  `identificador` y por `entidad_id` (aceleran los filtros y reportes).
+
+### Campos no obvios
+
+| Campo | Entidad | Por qué existe |
+|-------|---------|----------------|
+| `version` (`@Version`) | GrupoElectrogeno | Bloqueo optimista al descontar stock |
+| `precioUnitario` (`updatable=false`) | SolicitudCompra | Precio **congelado** al vender (ver §6) |
+| `total` | SolicitudCompra | Total persistido, no recalculado en cada lectura |
+| `createdAt` / `updatedAt` | varias | Auditoría automática (`@CreationTimestamp`/`@UpdateTimestamp`) |
+| `identificador` | SolicitudCompra | Código público de venta (UUID de 8 chars) |
+
+---
+
+## 6. Reglas de negocio clave
+
+### 6.1 Cálculo del precio de venta
+
+Implementado en `GrupoElectrogenoServiceImpl.calcularPrecioVenta()`. Es una función
+pura sobre el grupo:
+
+```
+potenciaMedia = (pMin + pMax) / 2
+precio        = vidaUtil × potenciaMedia
+              + 10   si (insonorizado AND capó)
+              + 15   si arranque AUTOMÁTICO
+si es MÓVIL:  + (cantidadRuedas × 5)
+              + 20   si eje ACERO     /  + 13 si eje ALEACIÓN
+si es FIJO:   + 200
+```
+
+### 6.2 Precio y total congelados (integridad histórica)
+
+**Problema que resuelve:** si el precio de cada venta se recalculara desde el grupo en
+cada lectura, **editar un grupo cambiaría retroactivamente la recaudación histórica**.
+
+**Solución:** al crear la venta (`crearSolicitud`), se calcula el precio unitario **una
+vez** y se persiste junto con el total (`precioUnitario × cantidad`). La columna
+`precio_unitario` es `updatable=false`. Los reportes (`calcularIngresosTotales`) suman
+los `total` ya congelados, nunca recalculan. Editar un grupo no toca ventas pasadas.
+
+### 6.3 Selección automática de grupo + validación de stock
+
+Al registrar una venta, el sistema **no** recibe un grupo: lo **elige** él. Busca entre
+los grupos del combustible pedido (ordenados por `pMax` desc) el primero cuya potencia
+máxima cubra la requerida. Luego:
+
+1. Verifica stock disponible ≥ cantidad pedida → si no, lanza
+   `StockInsuficienteException` (HTTP **409**).
+2. Descuenta el stock dentro de la misma transacción.
+
+### 6.4 Concurrencia: bloqueo optimista
+
+El descuento de stock es vulnerable a *lost updates* (dos ventas simultáneas leen el
+mismo stock y ambas descuentan). La columna `@Version` en `GrupoElectrogeno` hace que
+Hibernate detecte la escritura concurrente y falle la segunda transacción en vez de
+sobrescribir en silencio.
+
+---
+
+## 7. Seguridad
+
+### Modelo: JWT stateless
+
+`SecurityConfig` define una cadena de filtros **sin sesión** (`STATELESS`): cada request
+se autentica solo con su token. No hay cookies de sesión ni CSRF (deshabilitado por ser
+API stateless con bearer token).
+
+**Flujo:**
+
+1. `POST /api/v1/auth/login` → `AuthController` autentica con `AuthenticationManager` y
+   `JwtUtil.generateToken()` firma un JWT **HS256** con `subject = username` y un claim
+   `roles`. Expira en 1 hora.
+2. En cada request protegido, `JwtAuthorizationFilter` (un `OncePerRequestFilter`) lee
+   el header `Authorization: Bearer <token>`, lo valida contra `JpaUserDetailsService`
+   y puebla el `SecurityContext`.
+3. La autorización fina se aplica por método con `@PreAuthorize("hasRole('ADMIN')")`.
+
+### Reglas de acceso (definidas en `SecurityConfig`)
+
+| Ruta | Acceso |
+|------|--------|
+| `POST /api/v1/auth/**` | 🔓 Público (login / registro) |
+| `/swagger-ui/**`, `/v3/api-docs/**` | 🔓 Público |
+| `GET /api/v1/grupos-electrogenos/**` | 🔓 Público (catálogo) |
+| Resto de `/grupos-electrogenos/**` (POST/PUT/DELETE/PATCH) | 🔒 `ROLE_ADMIN` |
+| `GET /api/v1/ventas`, `GET /api/v1/ventas/{id}` | 🔐 Autenticado (cualquier rol) |
+| Resto de `/ventas/**` (crear/editar/borrar + reportes) | 🔒 `ROLE_ADMIN` |
+
+> **Defensa en profundidad:** las ventas no son públicas a nivel de filtro
+> (`anyRequest().authenticated()`), y los reportes financieros además exigen ADMIN por
+> `@PreAuthorize`. Dos capas, no una.
+
+### Decisiones de seguridad
+
+- **Registro siempre asigna `ROLE_USER`.** `AuthController.register()` nunca acepta un
+  rol del cliente: la creación de administradores no pasa por el endpoint público.
+- **Contraseñas con BCrypt** (`PasswordEncoder`), nunca en texto plano.
+- **Bootstrap del admin separado por entorno:**
+  - `DataInitializer` (`@Profile("dev","test")`) → crea `admin/admin123` para
+    desarrollo.
+  - `AdminBootstrap` (`@Profile("prod")`) → crea el admin desde variables de entorno
+    (`ADMIN_USERNAME`/`ADMIN_PASSWORD`); **sin defaults → si faltan, el arranque falla
+    (fail-fast).** Las credenciales de dev no existen en prod.
+
+---
+
+## 8. Manejo de errores
+
+`GlobalExceptionHandler` (`@ControllerAdvice`) centraliza la traducción de excepciones a
+respuestas HTTP consistentes. Nada de stack traces ni `try/catch` repartidos por los
+controllers.
+
+| Excepción | HTTP | Forma de respuesta |
+|-----------|------|--------------------|
+| `MethodArgumentNotValidException` | 400 | Mapa plano `campo → mensaje` |
+| `IllegalArgumentException` | 400 | Estándar `{timestamp, status, error, message}` |
+| `HttpMessageNotReadableException` | 400 | Enum / JSON inválido |
+| `ResourceNotFoundException` | 404 | Estándar |
+| `StockInsuficienteException` | 409 | Estándar |
+| `DataIntegrityViolationException` | 409 | Duplicado / restricción violada |
+| `AccessDeniedException` | 403 | "Acceso denegado…" |
+| `AuthenticationException` | 401 | Error de autenticación |
+| `Exception` (genérico) | 500 | Mensaje genérico; **el detalle solo se loguea en el servidor** |
+
+El handler genérico (500) es la pieza de endurecimiento final: cualquier excepción no
+prevista devuelve un mensaje neutro al cliente y registra la causa completa con SLF4J
+del lado del servidor. **No se filtran** rutas internas, librerías ni datos.
+
+---
+
+## 9. Perfiles y configuración
+
+Tres perfiles, una estrategia por entorno:
+
+| | **dev** | **test** | **prod** |
+|---|---------|----------|----------|
+| Base de datos | H2 en memoria | H2 efímero | PostgreSQL |
+| `ddl-auto` | `update` | `create-drop` | `validate` |
+| Flyway | desactivado | desactivado | **activado** |
+| Datos semilla | `data-entidades.sql` + admin | idem | solo roles (Flyway) + admin bootstrap |
+| Secretos | con defaults | con defaults | **sin defaults (fail-fast)** |
+| `show-sql` | `true` | `false` | `false` |
+
+**Puerto:** `8082` (definido en `application.properties`, no 8080).
+
+**Por qué `validate` en prod:** en producción JPA **no** modifica el esquema. La única
+fuente de verdad del esquema es **Flyway**; JPA solo verifica que las entidades calcen
+con las tablas creadas por las migraciones. Si no calzan, no arranca.
+
+**Variables de entorno de prod:** `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`,
+`DB_PASSWORD`, `JWT_SECRET_PROD`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL`,
+`ALLOWED_ORIGINS`.
+
+---
+
+## 10. Migraciones de base de datos
+
+Solo se aplican en **prod** (PostgreSQL). Ubicadas en `db/migration/`:
+
+| Versión | Qué hace |
+|---------|----------|
+| `V1__baseline.sql` | Esquema base completo (tablas, índices, FKs, CHECKs de enums) |
+| `V2__seed_roles.sql` | Siembra `ROLE_USER` y `ROLE_ADMIN` (idempotente) |
+| `V3__solicitud_precio_total.sql` | Agrega `precio_unitario` y `total` (precio congelado, §6.2) |
+| `V4__grupo_version.sql` | Agrega `version` para bloqueo optimista (§6.4) |
+
+Cada migración refleja una regla de negocio del backend. La verificación de que estas
+migraciones realmente levantan contra PostgreSQL real corre con **Testcontainers** en
+`MigracionesFlywayIntegrationTest`.
+
+---
+
+## 11. Testing y cobertura
+
+21 clases de test cubriendo las capas:
+
+- **Unit** — services, mappers (lógica de negocio aislada).
+- **Slice** — controllers (`@WebMvcTest`), repositories (`@DataJpaTest`).
+- **Integración** — flujo de compra end-to-end, integridad de venta, seed de entidades,
+  seguridad de acceso, CORS, fail-fast de secretos en prod.
+- **Testcontainers** — `MigracionesFlywayIntegrationTest` valida las migraciones Flyway
+  contra un **PostgreSQL real** en contenedor (no H2), porque las migraciones son
+  específicas de PostgreSQL.
+
+**Cobertura (JaCoCo):** el build aplica un *gate* en la fase `verify`. El umbral real
+configurado en `pom.xml` es **50% de líneas a nivel BUNDLE** (`COVEREDRATIO ≥ 0.50`);
+por debajo de eso el build falla. Reporte HTML en `target/site/jacoco/index.html`.
+
+> ⚠️ Nota: una versión anterior de este README mencionaba un umbral de 80%. El valor
+> efectivo que el `pom.xml` enforce hoy es **50%**.
+
+---
+
+## 12. Cómo ejecutar
 
 ### Requisitos
 - JDK 21
-- Maven (incluido como `./mvnw`)
+- Maven (incluido vía wrapper `./mvnw`)
+- Docker (solo para los tests de Testcontainers)
 
-### Ejecución
+### Desarrollo (H2, sin instalar nada)
 ```bash
 ./mvnw spring-boot:run
 ```
+Arranca en `http://localhost:8082` con perfil `dev`. Admin de demo: `admin` / `admin123`.
 
-### Tests y Cobertura
-Para ejecutar los tests y generar el reporte de JaCoCo:
+### Tests + cobertura
 ```bash
 ./mvnw verify
 ```
-El reporte estará disponible en: `target/site/jacoco/index.html`. 
-**Nota:** El build fallará si la cobertura de líneas es inferior al 80%.
+Corre toda la suite y genera el reporte JaCoCo. Falla si la cobertura < 50%.
 
-## Contrato API (Swagger)
-La documentación interactiva y el contrato OpenAPI están disponibles en:
-- **Swagger UI**: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
-- **OpenAPI Docs**: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
+### Documentación interactiva (Swagger)
+- **Swagger UI:** http://localhost:8082/swagger-ui/index.html
+- **OpenAPI JSON:** http://localhost:8082/v3/api-docs
 
-### Flujo de uso con Seguridad (JWT)
-Para probar los endpoints protegidos (POST/PUT/DELETE) desde Swagger UI:
-1. Ir al endpoint `POST /api/v1/auth/login`.
-2. Ejecutar con las credenciales (por defecto en dev: `admin` / `admin123`).
-3. Copiar el valor del campo `token` de la respuesta JSON.
-4. En la parte superior de Swagger UI, hacer clic en el botón **Authorize**.
-5. Pegar el token en el campo **Value** y pulsar **Authorize**.
-6. Ahora puedes consumir los endpoints de grupos y ventas con los permisos de administrador.
+Para probar endpoints protegidos: hacer `POST /api/v1/auth/login`, copiar el `token`,
+pulsar **Authorize** en Swagger y pegarlo.
 
-## Seguridad
-- **CORS**: Configurado para permitir orígenes específicos mediante la propiedad `cors.allowed-origins`. En producción, se puede sobrescribir con la variable de entorno `ALLOWED_ORIGINS` (ej. `ALLOWED_ORIGINS=https://mi-frontend.com,https://otro.com`).
-- **Endpoints públicos (GET)**: `/api/v1/grupos-electrogenos/**`, `/api/v1/solicitudes-compra/**`, `/api/v1/ventas/**`.
-- Endpoints protegidos (POST/PUT/DELETE): Requieren rol `ROLE_ADMIN` y Token JWT.
-- Obtener Token: `POST /api/v1/auth/login` con credenciales válidas.
+### Pruebas rápidas (.http)
+El archivo `smoke_test.http` permite probar endpoints desde IntelliJ o el REST Client
+de VS Code.
 
-## Pruebas E2E
-Se incluye el archivo `smoke_test.http` para realizar pruebas rápidas de los endpoints. Requiere un cliente REST que soporte el formato `.http` (como IntelliJ o VS Code REST Client).
+---
+
+## 13. Decisiones técnicas destacadas
+
+Resumen de las decisiones que más valor aportan, para defensa del informe:
+
+1. **DTOs + MapStruct en todas las fronteras.** Las entidades JPA nunca se serializan;
+   el mapeo es declarativo y verificado en compilación (no reflexión en runtime).
+2. **Precio congelado por venta.** Garantiza integridad histórica de la recaudación;
+   editar el catálogo no reescribe el pasado.
+3. **Bloqueo optimista (`@Version`).** Concurrencia correcta al descontar stock sin
+   bloquear filas pesadamente.
+4. **Flyway como única fuente del esquema en prod + JPA en `validate`.** Esquema
+   versionado, reproducible y auditado; nada de `ddl-auto=update` en producción.
+5. **Fail-fast de secretos en prod.** Sin `JWT_SECRET_PROD`, sin credenciales de admin
+   → no arranca. Imposible desplegar con defaults inseguros por olvido.
+6. **Seguridad en dos capas** (filtro por ruta + `@PreAuthorize` por método) y registro
+   público restringido a `ROLE_USER`.
+7. **Manejo de errores centralizado** que nunca filtra detalles internos al cliente.
+8. **Herencia JPA JOINED** para modelar fijo/móvil sin columnas nulas ni tabla única
+   inflada.
+9. **Testcontainers** para validar migraciones contra PostgreSQL real, no un sustituto
+   en memoria.

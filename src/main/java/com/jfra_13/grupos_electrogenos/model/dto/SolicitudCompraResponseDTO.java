@@ -28,4 +28,7 @@ public class SolicitudCompraResponseDTO {
     private Double precioVentaUnitario;
     // Total de la venta (precioVentaUnitario * cantidad), también congelado.
     private Double total;
+    // Vendedor que registró la venta (null en ventas legacy sin dueño).
+    private Long vendedorId;
+    private String vendedorUsername;
 }

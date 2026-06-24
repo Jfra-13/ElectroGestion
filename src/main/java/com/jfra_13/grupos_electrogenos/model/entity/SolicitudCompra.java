@@ -17,7 +17,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "solicitudes_compra", indexes = {
         @Index(name = "idx_solicitud_identificador", columnList = "identificador"),
-        @Index(name = "idx_solicitud_entidad", columnList = "entidad_id")
+        @Index(name = "idx_solicitud_entidad", columnList = "entidad_id"),
+        @Index(name = "idx_solicitud_vendedor", columnList = "vendedor_id")
 })
 @Data
 @NoArgsConstructor
@@ -75,6 +76,12 @@ public class SolicitudCompra {
     @JoinColumn(name = "grupo_id", nullable = false)
     @NotNull
     private GrupoElectrogeno grupoElectrogeno;
+
+    // Vendedor que registró la venta. Se setea desde el usuario autenticado, nunca
+    // desde el request. Nullable solo por las ventas legacy previas a esta columna.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vendedor_id")
+    private Usuario vendedor;
 
     @CreationTimestamp
     @Column(updatable = false)

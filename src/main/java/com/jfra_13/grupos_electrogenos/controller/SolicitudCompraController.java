@@ -1,6 +1,7 @@
 package com.jfra_13.grupos_electrogenos.controller;
 
 import com.jfra_13.grupos_electrogenos.model.dto.RankingEntidadDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.RankingVendedorDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.ReportePagoDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraResponseDTO;
@@ -36,8 +37,8 @@ public class SolicitudCompraController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Crear solicitud de compra", description = "Registra una nueva venta en el sistema. Requiere ROLE_ADMIN.")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLEADO')")
+    @Operation(summary = "Crear solicitud de compra", description = "Registra una nueva venta. La venta queda atribuida al usuario autenticado. Requiere ROLE_ADMIN o ROLE_EMPLEADO.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Venta registrada exitosamente"),
             @ApiResponse(responseCode = "400", description = "Datos de entrada inválidos")
@@ -79,18 +80,28 @@ public class SolicitudCompraController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar ventas paginado", description = "Lista las ventas con paginación y ordenamiento")
+    @Operation(summary = "Listar ventas paginado",
+            description = "Un EMPLEADO ve solo sus ventas; un ADMIN ve todas, o las de un empleado puntual con vendedorId.")
     public ResponseEntity<PaginatedResponseDTO<SolicitudCompraResponseDTO>> listarVentas(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false, defaultValue = "id,asc") String sort) {
+            @RequestParam(required = false, defaultValue = "id,asc") String sort,
+            @RequestParam(required = false) Long vendedorId) {
 
         Sort.Direction direction = sort.toLowerCase().endsWith("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
         String sortProp = sort.contains(",") ? sort.split(",")[0] : sort;
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortProp));
 
-        PaginatedResponseDTO<SolicitudCompraResponseDTO> result = service.listarVentasPaginado(pageable);
+        PaginatedResponseDTO<SolicitudCompraResponseDTO> result = service.listarVentasPaginado(pageable, vendedorId);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/por-empleado")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Ranking de ventas por empleado",
+            description = "Cantidad de ventas y total recaudado por cada vendedor. Vista del jefe. Requiere ROLE_ADMIN.")
+    public ResponseEntity<List<RankingVendedorDTO>> getRankingPorEmpleado() {
+        return ResponseEntity.ok(service.obtenerRankingVendedores());
     }
 
     @GetMapping("/reporte-pagos")

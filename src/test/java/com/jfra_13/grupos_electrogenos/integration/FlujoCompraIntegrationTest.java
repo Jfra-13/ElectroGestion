@@ -37,7 +37,7 @@ public class FlujoCompraIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void flujoCompletoCompra() throws Exception {
         // 1. Usar la entidad semilla fija
         assertTrue(entidadRepository.existsById(1L), "Debe existir la entidad semilla con ID 1");
@@ -73,7 +73,9 @@ public class FlujoCompraIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudDTO)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.grupoCodigo").value("INT-001"));
+                .andExpect(jsonPath("$.grupoCodigo").value("INT-001"))
+                // Fase 2: la venta queda atribuida al usuario autenticado.
+                .andExpect(jsonPath("$.vendedorUsername").value("admin"));
 
         // 4. Verificar Ingresos Totales
         mockMvc.perform(get("/api/v1/ventas/ingresos-totales"))
