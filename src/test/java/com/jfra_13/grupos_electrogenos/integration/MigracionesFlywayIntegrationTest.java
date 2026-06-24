@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest
 @ActiveProfiles("prod")
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class MigracionesFlywayIntegrationTest {
 
     @Container

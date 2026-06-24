@@ -291,7 +291,46 @@ Lista todos los usuarios del sistema (para la pantalla de gestión de empleados)
 
 ---
 
-### 4.3 Grupos Electrógenos — `/api/v1/grupos-electrogenos`
+### 4.3 Clientes — `/api/v1/clientes`
+
+> Disponible para `ROLE_ADMIN` y `ROLE_EMPLEADO`. Resuelve el `entidadId` que pide
+> el formulario de venta: el front busca el cliente y, si no existe, lo crea (alta inline).
+> Internamente el recurso es la entidad `Entidad`; el nombre es **único** (case-insensitive).
+
+#### 🔒 POST `/api/v1/clientes`  *(ADMIN o EMPLEADO)*
+
+Crea un cliente nuevo.
+
+**Request:**
+```json
+{ "nombre": "Constructora del Sur S.A." }
+```
+
+**Response `201`:**
+```json
+{ "id": 100, "nombre": "Constructora del Sur S.A.", "createdAt": "2026-06-24T11:00:00" }
+```
+
+**Errores:**
+- `400` — nombre vacío o fuera de 2–150 caracteres.
+- `409` — ya existe un cliente con ese nombre (el front reacciona buscándolo).
+- `401/403` — sin autenticación o sin rol.
+
+#### 🔒 GET `/api/v1/clientes?nombre=`  *(ADMIN o EMPLEADO)*
+
+Autocomplete de clientes. Con `nombre` filtra por coincidencia parcial; sin `nombre`
+devuelve todos en orden alfabético.
+
+**Response `200`:**
+```json
+[
+  { "id": 100, "nombre": "Constructora del Sur S.A.", "createdAt": "2026-06-24T11:00:00" }
+]
+```
+
+---
+
+### 4.4 Grupos Electrógenos — `/api/v1/grupos-electrogenos`
 
 > Los `GET` de este recurso son **públicos** (catálogo). El resto requiere `ROLE_ADMIN`.
 
@@ -476,7 +515,7 @@ Actualiza el stock disponible. El nuevo stock va como **query param**, no en el 
 
 ---
 
-### 4.4 Ventas (Solicitudes de Compra) — `/api/v1/ventas`
+### 4.5 Ventas (Solicitudes de Compra) — `/api/v1/ventas`
 
 > ⚠️ **Ningún endpoint de ventas es público.** Como mínimo requieren token
 > (autenticado). Los reportes financieros requieren `ROLE_ADMIN`.
@@ -700,6 +739,8 @@ async function apiFetch(path, options = {}) {
 | POST | `/api/v1/auth/register` | 🔓 | Registro público (rol USER) |
 | POST | `/api/v1/usuarios` | 🔒 ADMIN | Crear empleado/admin |
 | GET | `/api/v1/usuarios` | 🔒 ADMIN | Listar usuarios |
+| POST | `/api/v1/clientes` | 🔒 ADMIN/EMPLEADO | Crear cliente |
+| GET | `/api/v1/clientes` | 🔒 ADMIN/EMPLEADO | Buscar clientes (autocomplete) |
 | GET | `/api/v1/grupos-electrogenos` | 🔓 | Listar grupos (paginado) |
 | GET | `/api/v1/grupos-electrogenos/{id}` | 🔓 | Detalle de grupo |
 | GET | `/api/v1/grupos-electrogenos/{id}/precio` | 🔓 | Cotizar precio (número) |
