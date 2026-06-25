@@ -12,9 +12,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface GrupoElectrogenoRepository extends JpaRepository<GrupoElectrogeno, Long> {
+
+    // Venta por grupo elegido: resolver el grupo exacto por su código de negocio.
+    Optional<GrupoElectrogeno> findByCodigo(String codigo);
 
     // RF04: Listar por combustible, ordenado por potencia máxima descendente
     // Spring Boot lee el nombre del método y arma el SQL "SELECT * WHERE tipoCombustible = ? ORDER BY pMax DESC"

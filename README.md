@@ -181,7 +181,8 @@ src/main/resources/
 ├── application-dev.properties           # H2 en memoria, ddl-auto=update, datos de demo
 ├── application-prod.properties          # PostgreSQL, ddl-auto=validate, Flyway ON, fail-fast
 ├── application-test.properties          # H2 create-drop efímero
-├── data-entidades.sql                   # Datos semilla de entidades (dev/test)
+├── data-dev.sql                         # Seed RICO de dev (perfil dev): roles, 2 vendedores, 9 grupos por código, 2 clientes y 8 ventas con precio REAL calculado. Ver §9.1
+├── data-entidades.sql                   # Seed MÍNIMO de test (perfil test): 1 entidad "Empresa Demo" idempotente
 └── db/migration/                        # Migraciones Flyway (V1..V4) — solo prod
 
 src/test/java/...                        # 21 clases de test (unit + integración + Testcontainers)
@@ -354,7 +355,8 @@ Tres perfiles, una estrategia por entorno:
 | Base de datos | H2 en memoria | H2 efímero | PostgreSQL |
 | `ddl-auto` | `update` | `create-drop` | `validate` |
 | Flyway | desactivado | desactivado | **activado** |
-| Datos semilla | `data-entidades.sql` + admin | idem | solo roles (Flyway) + admin bootstrap |
+| Datos semilla | `data-dev.sql` (seed rico, §9.1) + admin | `data-entidades.sql` (1 cliente) | solo roles (Flyway) + admin bootstrap |
+| Ingesta semilla (`spring.sql.init.mode`) | `always` (recargable, §9.1) | `always` | — (Flyway) |
 | Secretos | con defaults | con defaults | **sin defaults (fail-fast)** |
 | `show-sql` | `true` | `false` | `false` |
 
@@ -367,6 +369,71 @@ con las tablas creadas por las migraciones. Si no calzan, no arranca.
 **Variables de entorno de prod:** `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`,
 `DB_PASSWORD`, `JWT_SECRET_PROD`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL`,
 `ALLOWED_ORIGINS`.
+
+### 9.1 Ingesta de datos de ejemplo (perfil dev / simulaciones)
+
+Para demos y simulaciones, el perfil **dev** carga un seed completo en **cada arranque**.
+Como H2 es en memoria y efímera, la base nace vacía en cada `run` y el script la repuebla
+idéntica — no hace falta limpiar nada entre simulaciones: **reiniciar = resetear**.
+
+**Qué siembra `src/main/resources/data-dev.sql`:**
+
+| Bloque | Contenido |
+|--------|-----------|
+| Roles | `ROLE_USER`, `ROLE_ADMIN`, `ROLE_EMPLEADO` |
+| Vendedores | `jperez`, `mgomez` (ambos `ROLE_EMPLEADO`, password `password`) |
+| Clientes | `Constructora del Sur S.A.` (id 1), `Minera Andes SRL` (id 2) |
+| Grupos | **9 grupos por código**: 5 fijos `GE-FIJ-00x` + 4 móviles `GE-MOV-00x` |
+| Ventas | 8 ventas con `precio_unitario`/`total` **congelados y reales** (ver abajo) |
+
+> El admin (`admin`/`admin123`) NO está en el script: lo crea `DataInitializer` tras el seed.
+
+**Activar / desactivar** — en `src/main/resources/application-dev.properties`:
+
+```properties
+# ACTIVADO (default): recarga el seed en cada arranque dev
+spring.sql.init.mode=always
+spring.sql.init.data-locations=classpath:data-dev.sql
+
+# DESACTIVAR: poner mode=never (la línea data-locations puede quedar, se ignora)
+# spring.sql.init.mode=never
+```
+
+⚠️ Con `mode=always` la línea `data-locations` es **obligatoria**: sin ella Spring busca
+`data.sql` (que no existe) y el seed no carga. `defer-datasource-initialization=true` hace
+que el script corra DESPUÉS de que Hibernate crea el esquema.
+
+**Regla de oro de los precios (NO inventar montos):**
+Las ventas del seed **no** llevan precios arbitrarios. Cada `precio_unitario` es la salida
+**real** de `GrupoElectrogenoServiceImpl.calcularPrecioVenta()` para el `grupo_id` asignado,
+y `total = precio_unitario × cantidad` — exactamente lo que la app congelaría al vender (§6.1,
+§6.2). Si se edita un grupo del seed (potencia, vida útil, arranque…), hay que **recalcular**
+el precio de sus ventas con la fórmula. Precios reales vigentes por grupo:
+
+| Grupo | Tipo | Precio real | Grupo | Tipo | Precio real |
+|-------|------|-------------|-------|------|-------------|
+| `GE-FIJ-001` | fijo | 350.0 | `GE-MOV-001` | móvil | 194.5 |
+| `GE-FIJ-002` | fijo | 500.0 | `GE-MOV-002` | móvil | 127.5 |
+| `GE-FIJ-003` | fijo | 275.0 | `GE-MOV-003` | móvil | 590.0 |
+| `GE-FIJ-004` | fijo | 975.0 | `GE-MOV-004` | móvil | 156.0 |
+| `GE-FIJ-005` | fijo | 250.0 | | | |
+
+**Comandos para simular** (el wrapper `./mvnw` usa `.mvn/wrapper`, no requiere Maven instalado):
+
+```bash
+# Simulación estándar (perfil dev, puerto 8082, seed cargado)
+./mvnw spring-boot:run
+
+# Si el 8082 está ocupado por otra instancia: arrancar en puerto libre aleatorio
+./mvnw spring-boot:run -Dspring-boot.run.arguments=--server.port=0
+
+# Resetear el estado de la simulación: parar (Ctrl+C) y volver a arrancar.
+# H2 es en memoria → cada arranque parte del seed limpio, sin pasos extra.
+```
+
+Inspeccionar la base en vivo durante la simulación: consola H2 en
+`http://localhost:8082/h2-console` (JDBC URL `jdbc:h2:mem:grupos_electrogenos_dev`, user `sa`,
+sin password).
 
 ---
 
@@ -420,6 +487,8 @@ por debajo de eso el build falla. Reporte HTML en `target/site/jacoco/index.html
 ./mvnw spring-boot:run
 ```
 Arranca en `http://localhost:8082` con perfil `dev`. Admin de demo: `admin` / `admin123`.
+Carga automáticamente el seed de ejemplo (9 grupos, clientes y ventas con precios reales);
+cómo activarlo/desactivarlo y simular → **[§9.1](#91-ingesta-de-datos-de-ejemplo-perfil-dev--simulaciones)**.
 
 ### Tests + cobertura
 ```bash
