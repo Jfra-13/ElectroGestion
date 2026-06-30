@@ -1,6 +1,8 @@
 package com.jfra_13.grupos_electrogenos.service.impl;
 
+import com.jfra_13.grupos_electrogenos.exception.ResourceInUseException;
 import com.jfra_13.grupos_electrogenos.exception.ResourceNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoElectrogenoResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.GrupoMovilResumenDTO;
@@ -66,7 +68,15 @@ public class GrupoElectrogenoServiceImpl implements GrupoElectrogenoService {
         if (!repository.existsById(id)) {
             throw new ResourceNotFoundException("Grupo Electrógeno no encontrado con ID: " + id);
         }
-        repository.deleteById(id);
+        try {
+            // flush para que la violación de FK salte aquí (no al cerrar la tx)
+            // y podamos traducirla a un 409 con mensaje claro.
+            repository.deleteById(id);
+            repository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResourceInUseException(
+                    "No se puede eliminar el grupo: tiene ventas registradas.");
+        }
     }
 
     @Override

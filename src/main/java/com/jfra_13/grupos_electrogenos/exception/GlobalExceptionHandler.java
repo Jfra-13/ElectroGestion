@@ -52,6 +52,11 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(mensaje, HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(ResourceInUseException.class)
+    public ResponseEntity<Map<String, Object>> handleResourceInUseException(ResourceInUseException ex) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(StockInsuficienteException.class)
     public ResponseEntity<Map<String, Object>> handleStockInsuficienteException(StockInsuficienteException ex) {
         return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT);
