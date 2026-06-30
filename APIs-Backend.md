@@ -523,6 +523,12 @@ Actualiza el stock disponible. El nuevo stock va como **query param**, no en el 
 > 🧭 **Filtrado por rol:** un `EMPLEADO` solo ve y opera **sus propias** ventas; un
 > `ADMIN` ve todas y puede filtrar por empleado. La venta queda atribuida al usuario
 > autenticado (campos `vendedorId` / `vendedorUsername` en la respuesta).
+>
+> 🚫 **Anulación:** las ventas no se borran, se **anulan**
+> (`POST /ventas/{id}/anulacion`). Una venta `ANULADA` sigue apareciendo en los
+> listados (`GET /ventas`, `GET /ventas/{id}`) con su `estado`, pero queda **excluida
+> de todos los reportes financieros** (`ranking-clientes`, `por-empleado`,
+> `reporte-pagos`, `ingresos-totales`): esos endpoints solo cuentan ventas `ACTIVA`.
 
 #### 🟩 POST `/api/v1/ventas`  *(ADMIN o EMPLEADO)*
 
@@ -573,12 +579,20 @@ indicar el vendedor en el request).
   "precioVentaUnitario": 1500.0,
   "total": 3000.0,
   "vendedorId": 5,
-  "vendedorUsername": "vendedor1"
+  "vendedorUsername": "vendedor1",
+  "estado": "ACTIVA",
+  "motivoAnulacion": null,
+  "anuladaAt": null,
+  "anuladaPor": null
 }
 ```
 
 > `vendedorId` / `vendedorUsername` identifican quién hizo la venta. En ventas
 > legacy (previas a esta función) pueden venir `null`.
+>
+> `estado` es `ACTIVA` o `ANULADA`. Si está `ANULADA`, los campos `motivoAnulacion`,
+> `anuladaAt` y `anuladaPor` (username) traen los datos de la anulación; si está
+> `ACTIVA`, vienen `null`. El front pinta distinto las anuladas (ver `GET /ventas`).
 
 **Errores:** `400` validación, `409` si no hay stock suficiente
 (`Stock insuficiente...`), `403` sin rol (ni admin ni empleado), `404` si la
@@ -620,13 +634,44 @@ pide una venta que no es suya.
 
 #### 🔒 PUT `/api/v1/ventas/{id}`  *(ADMIN)*
 
-Actualiza una venta. Mismo body que POST. **Response `200`:** venta actualizada.
+Edición **acotada**: solo se puede cambiar `nombreSolicitante`. El resto (`tipoPago`,
+`cantidad`, `potenciaRequerida`, `tipoCombustible`, grupo, precio, total) es
+**inmutable**; mandarlo en el body se ignora. Para corregir esos campos: anular la
+venta y registrar una nueva.
+
+**Request:**
+```json
+{ "nombreSolicitante": "Juan Pérez (corregido)" }
+```
+
+**Response `200`:** venta actualizada (forma `SolicitudCompraResponseDTO`).
+
+**Errores:** `400` si `nombreSolicitante` viene vacío; `404` si no existe;
+`409` si la venta está **anulada** (no se edita una venta anulada).
 
 ---
 
-#### 🔒 DELETE `/api/v1/ventas/{id}`  *(ADMIN)*
+#### 🔒 POST `/api/v1/ventas/{id}/anulacion`  *(ADMIN)*
 
-Borra una venta. **Response `204`** (sin cuerpo).
+Anula una venta (reversa con rastro): la marca `ANULADA`, **repone el stock**, deja
+auditoría (quién, cuándo, por qué) y la **saca de los reportes financieros**. No la
+borra: sigue visible en el listado, con su monto congelado. Reemplaza al viejo
+`DELETE /ventas/{id}` (eliminado).
+
+**Request:**
+```json
+{ "motivo": "Error de carga: cliente equivocado" }
+```
+
+| Campo | Tipo | Obligatorio | Regla |
+|-------|------|-------------|-------|
+| `motivo` | string | ✅ | no vacío |
+
+**Response `200`:** la venta ya `ANULADA` (incluye `estado`, `motivoAnulacion`,
+`anuladaAt`, `anuladaPor`).
+
+**Errores:** `400` si falta `motivo`; `404` si no existe; `409` si la venta **ya
+estaba anulada**; `403` sin rol admin.
 
 ---
 
@@ -753,8 +798,8 @@ async function apiFetch(path, options = {}) {
 | POST | `/api/v1/ventas` | 🟩 ADMIN/EMPLEADO | Registrar venta (atribuida al usuario) |
 | GET | `/api/v1/ventas` | 🔐 Auth | Listar ventas (empleado: solo suyas; admin: todas o `?vendedorId`) |
 | GET | `/api/v1/ventas/{id}` | 🔐 Auth | Detalle de venta (empleado: solo la suya) |
-| PUT | `/api/v1/ventas/{id}` | 🔒 ADMIN | Editar venta |
-| DELETE | `/api/v1/ventas/{id}` | 🔒 ADMIN | Borrar venta |
+| PUT | `/api/v1/ventas/{id}` | 🔒 ADMIN | Editar venta (solo `nombreSolicitante`) |
+| POST | `/api/v1/ventas/{id}/anulacion` | 🔒 ADMIN | Anular venta (repone stock, deja rastro) |
 | GET | `/api/v1/ventas/por-empleado` | 🔒 ADMIN | Ranking de ventas por empleado |
 | GET | `/api/v1/ventas/ranking-clientes` | 🔒 ADMIN | Ranking de clientes |
 | GET | `/api/v1/ventas/reporte-pagos` | 🔒 ADMIN | Reporte por tipo de pago |
