@@ -26,6 +26,7 @@ basada en **JWT**, persistencia **JPA/PostgreSQL**, migraciones versionadas con
 11. [Testing y cobertura](#11-testing-y-cobertura)
 12. [Cómo ejecutar](#12-cómo-ejecutar)
 13. [Decisiones técnicas destacadas](#13-decisiones-técnicas-destacadas)
+14. [Despliegue en producción (Heroku + Supabase)](#14-despliegue-en-producción-heroku--supabase)
 
 ---
 
@@ -530,3 +531,136 @@ Resumen de las decisiones que más valor aportan, para defensa del informe:
    inflada.
 9. **Testcontainers** para validar migraciones contra PostgreSQL real, no un sustituto
    en memoria.
+
+---
+
+## 14. Despliegue en producción (Heroku + Supabase)
+
+### 14.1 Arquitectura de despliegue
+
+El sistema corre en **tres servicios separados**:
+
+```
+┌──────────────────────────┐      ┌──────────────────────────┐
+│ HEROKU — app frontend     │      │ HEROKU — app backend      │
+│ Astro 6 SSR (Node 21)     │ ───► │ Spring Boot — perfil prod │
+│ npm start (entry.mjs)     │ HTTP │ java -jar (perfil prod)   │
+│ escucha en $PORT          │ CORS │ escucha en $PORT          │
+└──────────────────────────┘      └────────────┬─────────────┘
+                                                │ JDBC (pooler)
+                                                ▼
+                                   ┌──────────────────────────┐
+                                   │ SUPABASE PostgreSQL 17     │
+                                   │ pooler transaction :6543   │
+                                   │ Flyway V1..V7 + validate   │
+                                   └──────────────────────────┘
+```
+
+- **Frontend** y **backend** son **dos apps Heroku distintas**, cada una conectada a su
+  propio repo de GitHub y con su dyno **Basic** (no duerme; evita cold-start en demo).
+- La **base de datos** vive en **Supabase** (Postgres gestionado), accedida por el
+  **pooler en modo transaction (puerto 6543)**, no por la conexión directa.
+- El navegador habla con el front; el front llama al back con `Authorization: Bearer`
+  (no cookie cross-site); el back conecta a Supabase por JDBC.
+
+### 14.2 Backend — preparación del repo
+
+Archivos que Heroku necesita para arrancar el JAR (en la raíz del repo backend):
+
+| Archivo | Contenido | Para qué |
+|---------|-----------|----------|
+| `Procfile` | `web: java -Dserver.port=$PORT -jar target/*.jar` | Define el proceso web del dyno |
+| `system.properties` | `java.runtime.version=21` | Fija la versión de Java del buildpack |
+| `application.properties` | `server.port=${PORT:8082}` | Heroku inyecta `$PORT`; sin esto el dyno no recibe tráfico |
+
+El buildpack de Java corre `./mvnw -DskipTests package`, genera `target/*.jar` y lo
+arranca con el `Procfile`.
+
+### 14.3 Backend — config vars (Heroku → Settings → Config Vars)
+
+| Var | Valor | Notas |
+|-----|-------|-------|
+| `SPRING_PROFILES_ACTIVE` | `prod` | Activa Postgres + Flyway + `validate` |
+| `DB_HOST` | `aws-1-sa-east-1.pooler.supabase.com` | **Host EXACTO del pooler** (ver §14.6) |
+| `DB_PORT` | `6543` | Pooler transaction mode |
+| `DB_NAME` | `postgres` | |
+| `DB_USER` | `postgres.<project-ref>` | El ref es el de la URL del proyecto Supabase |
+| `DB_PASSWORD` | _(password Supabase)_ | |
+| `JWT_SECRET_PROD` | _(secreto largo random)_ | Sin esto, fail-fast |
+| `ADMIN_USERNAME` | _(usuario del primer admin)_ | **Sin default → fail-fast** |
+| `ADMIN_PASSWORD` | _(contraseña del primer admin)_ | **Sin default → fail-fast** |
+| `ADMIN_EMAIL` | _(opcional)_ | Default `admin@electrogenos.local` |
+| `ALLOWED_ORIGINS` | URL exacta del front, **sin barra final** | CORS |
+
+> El JDBC URL de prod agrega `?prepareThreshold=0` (ver §14.6) — obligatorio con el
+> pooler transaction de Supabase.
+
+### 14.4 Frontend — preparación del repo
+
+El front es **Astro SSR** con `@astrojs/node` en modo `standalone`, que genera un server
+Node autónomo (`dist/server/entry.mjs`). Requisitos en el repo del front:
+
+| Requisito | Detalle |
+|-----------|---------|
+| Script `start` en `package.json` | `"start": "node ./dist/server/entry.mjs"` |
+| `Procfile` | `web: node ./dist/server/entry.mjs` |
+| Carpeta `public/` **trackeada en git** | Logos, íconos y hero viven ahí (ver §14.6) |
+
+Config vars del front (⚠️ **antes** del primer build — Astro inlinea las `PUBLIC_*` al
+compilar):
+
+| Var | Valor |
+|-----|-------|
+| `PUBLIC_API_BASE_URL` | URL EXACTA del backend Heroku, sin barra final |
+| `HOST` | `0.0.0.0` (si no, el router no llega al dyno → boot timeout) |
+| `NPM_CONFIG_PRODUCTION` | `false` (instala devDeps necesarias para el build) |
+
+> Si cambia la URL del backend, **no basta** editar `PUBLIC_API_BASE_URL`: hay que
+> **redeployar** el front (la var se inlinea en build, no en runtime).
+
+### 14.5 Orden de despliegue
+
+1. **Supabase:** crear proyecto, anotar password, copiar datos del pooler (Connect →
+   Direct → Connection string → *Transaction pooler*).
+2. **Backend:** push → setear config vars → Deploy Branch → esperar
+   `Started GruposElectrogenosApplication` → probar `…/swagger-ui/index.html`.
+3. **Frontend:** setear config vars (incluida `PUBLIC_API_BASE_URL` con la URL real del
+   back) → Deploy Branch → abrir y verificar catálogo.
+4. **CORS:** en el backend, setear `ALLOWED_ORIGINS` con la URL real del front → Deploy
+   Branch.
+
+> En Heroku moderno las URLs llevan hash: `electrogen-back-<hash>.herokuapp.com`. Usar la
+> URL **real** (con hash) en `PUBLIC_API_BASE_URL` y `ALLOWED_ORIGINS`, no el nombre pelado.
+
+### 14.6 Problemas reales encontrados y su causa (troubleshooting)
+
+Lecciones del despliegue. La mayoría **no eran bugs de código**, sino de configuración o
+infraestructura.
+
+| Síntoma | Causa raíz | Solución |
+|---------|-----------|----------|
+| Backend: `This app has no process types yet` | Se deployó un commit **anterior** al `Procfile` | Deploy Branch del commit que ya incluye `Procfile` |
+| Backend: `FATAL: (ENOTFOUND) tenant/user ... not found` | `DB_HOST` con prefijo de región equivocado (`aws-0` en vez de `aws-1`) | Copiar el host EXACTO del Connect de Supabase |
+| Backend: `Found non-empty schema "public" but no schema history table` | El schema tenía tablas a medio crear de un intento fallido, sin historial Flyway | Resetear schema en Supabase SQL Editor: `DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ...` y redeploy |
+| Backend: `prepared statement "S_x" already exists` | El **pooler transaction (6543)** reusa conexiones y rompe los prepared statements server-side de pgjdbc | Agregar `?prepareThreshold=0` al JDBC URL en `application-prod.properties` |
+| Backend: `Could not resolve placeholder 'ADMIN_USERNAME'` | Faltaban las config vars `ADMIN_USERNAME` / `ADMIN_PASSWORD` (fail-fast por diseño, §7) | Setearlas y **Deploy Branch** (no solo guardar la var) |
+| Front: crash con `npm error ... Did you mean npm star` | Faltaba el script `start` en el `package.json` deployado (commits sin pushear) | Pushear el `start` script y Deploy Branch |
+| Front: imágenes/logos 404 (`/assets/...`) | `public/` estaba en `.gitignore` → Heroku no recibía los estáticos | Sacar `public/` del `.gitignore` (en Astro `public/` es **source**, no build output) y commitear |
+| Front: `failed to fetch` / `Application error` | El back estaba caído (503/H10) o la URL/CORS no matcheaba | Levantar el back primero; usar URLs reales con hash; `ALLOWED_ORIGINS` sin barra final |
+
+**Notas de pooler (Supabase):**
+
+- El host **directo** (`db.<ref>.supabase.co:5432`) casi no es IPv4-reachable hoy. Usar
+  siempre el **pooler** (`aws-N-<region>.pooler.supabase.com:6543`).
+- Con el pooler transaction + JPA, `prepareThreshold=0` es **obligatorio**, si no fallan
+  queries en runtime de forma intermitente.
+
+**Notas de Heroku:**
+
+- `H10 "App crashed"` es un **síntoma** (el proceso murió), no la causa: leer los logs
+  de la app para la causa real.
+- Cambiar una config var redeploya el **slug actual**; para tomar código nuevo hay que
+  **Deploy Branch**.
+- `flyway_schema_history` (la tabla que Flyway crea para llevar el registro de migraciones
+  aplicadas) confirma que las migraciones corrieron: si existe y tiene filas, el schema
+  está bien.
