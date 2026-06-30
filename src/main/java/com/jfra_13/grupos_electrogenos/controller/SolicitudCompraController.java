@@ -3,7 +3,9 @@ package com.jfra_13.grupos_electrogenos.controller;
 import com.jfra_13.grupos_electrogenos.model.dto.RankingEntidadDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.RankingVendedorDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.ReportePagoDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.AnulacionRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraUpdateDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
 import com.jfra_13.grupos_electrogenos.service.SolicitudCompraService;
@@ -59,17 +61,28 @@ public class SolicitudCompraController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Actualizar venta", description = "Modifica los datos de una venta existente. Requiere ROLE_ADMIN.")
-    public ResponseEntity<SolicitudCompraResponseDTO> actualizarSolicitud(@PathVariable Long id, @Valid @RequestBody SolicitudCompraRequestDTO dto) {
+    @Operation(summary = "Actualizar venta (acotado)",
+            description = "Edita SOLO el nombre del solicitante. El resto (tipoPago, cantidad, potencia, combustible, grupo, precio) es inmutable: para cambiarlo, anular y registrar una nueva venta. Requiere ROLE_ADMIN.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Venta actualizada"),
+            @ApiResponse(responseCode = "404", description = "Venta no encontrada"),
+            @ApiResponse(responseCode = "409", description = "La venta está anulada y no se puede editar")
+    })
+    public ResponseEntity<SolicitudCompraResponseDTO> actualizarSolicitud(@PathVariable Long id, @Valid @RequestBody SolicitudCompraUpdateDTO dto) {
         return ResponseEntity.ok(service.actualizarSolicitud(id, dto));
     }
 
-    @DeleteMapping("/{id}")
+    @PostMapping("/{id}/anulacion")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Eliminar venta", description = "Borra una venta del sistema. Requiere ROLE_ADMIN.")
-    public ResponseEntity<Void> eliminarSolicitud(@PathVariable Long id) {
-        service.eliminarSolicitud(id);
-        return ResponseEntity.noContent().build();
+    @Operation(summary = "Anular venta",
+            description = "Anula una venta (reversa con rastro): la marca ANULADA, repone el stock y la saca de los reportes. No la borra. Requiere ROLE_ADMIN.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Venta anulada"),
+            @ApiResponse(responseCode = "404", description = "Venta no encontrada"),
+            @ApiResponse(responseCode = "409", description = "La venta ya estaba anulada")
+    })
+    public ResponseEntity<SolicitudCompraResponseDTO> anularVenta(@PathVariable Long id, @Valid @RequestBody AnulacionRequestDTO dto) {
+        return ResponseEntity.ok(service.anularVenta(id, dto));
     }
 
     @GetMapping("/ranking-clientes")

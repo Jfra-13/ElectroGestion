@@ -17,15 +17,25 @@ import java.util.List;
 @Repository
 public interface SolicitudCompraRepository extends JpaRepository<SolicitudCompra, Long> {
 
-    // RF05: Ranking de entidades ordenadas por la cantidad total de grupos solicitados
+    // RF05: Ranking de entidades ordenadas por la cantidad total de grupos solicitados.
+    // Solo ventas ACTIVA: las anuladas no cuentan en finanzas.
     @Query("SELECT s.entidad.nombre AS nombreEntidad, SUM(s.cantidad) AS totalSolicitados " +
-            "FROM SolicitudCompra s GROUP BY s.entidad.nombre ORDER BY totalSolicitados DESC")
+            "FROM SolicitudCompra s WHERE s.estado = com.jfra_13.grupos_electrogenos.model.enums.EstadoVenta.ACTIVA " +
+            "GROUP BY s.entidad.nombre ORDER BY totalSolicitados DESC")
     List<RankingEntidadDTO> obtenerRankingEntidades();
 
-    // RF08: Listado por tipo de pago, ordenado por cantidad
+    // RF08: Listado por tipo de pago, ordenado por cantidad. Solo ventas ACTIVA.
     @Query("SELECT s.nombreSolicitante AS solicitante, s.cantidad AS cantidad " +
-            "FROM SolicitudCompra s WHERE s.tipoPago = :tipoPago ORDER BY s.cantidad DESC")
+            "FROM SolicitudCompra s WHERE s.tipoPago = :tipoPago " +
+            "AND s.estado = com.jfra_13.grupos_electrogenos.model.enums.EstadoVenta.ACTIVA " +
+            "ORDER BY s.cantidad DESC")
     List<ReportePagoDTO> obtenerReportePorTipoPago(@Param("tipoPago") TipoPago tipoPago);
+
+    // RF06: ingresos totales = suma de los totales congelados de las ventas ACTIVA.
+    // Agregado en la DB (no se trae todo a memoria). COALESCE para devolver 0 si no hay ventas.
+    @Query("SELECT COALESCE(SUM(s.total), 0) FROM SolicitudCompra s " +
+            "WHERE s.estado = com.jfra_13.grupos_electrogenos.model.enums.EstadoVenta.ACTIVA")
+    Double sumarIngresosActivas();
 
     // Variante paginada para listar ventas filtradas por tipo de pago
     Page<SolicitudCompra> findByTipoPago(TipoPago tipoPago, Pageable pageable);
@@ -37,6 +47,7 @@ public interface SolicitudCompraRepository extends JpaRepository<SolicitudCompra
     // Ranking de ventas por empleado para la vista del jefe (solo ventas con vendedor).
     @Query("SELECT s.vendedor.username AS vendedor, COUNT(s) AS cantidadVentas, SUM(s.total) AS totalRecaudado " +
             "FROM SolicitudCompra s WHERE s.vendedor IS NOT NULL " +
+            "AND s.estado = com.jfra_13.grupos_electrogenos.model.enums.EstadoVenta.ACTIVA " +
             "GROUP BY s.vendedor.username ORDER BY totalRecaudado DESC")
     List<RankingVendedorDTO> obtenerRankingVendedores();
 }

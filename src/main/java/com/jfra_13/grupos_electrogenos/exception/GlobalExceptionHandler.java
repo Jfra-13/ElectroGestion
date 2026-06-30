@@ -62,6 +62,11 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(VentaYaAnuladaException.class)
+    public ResponseEntity<Map<String, Object>> handleVentaYaAnuladaException(VentaYaAnuladaException ex) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<Map<String, Object>> handleDuplicateResourceException(DuplicateResourceException ex) {
         return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT);

@@ -49,21 +49,17 @@ public class SolicitudCompraServiceTest {
 
     @Test
     void debeCalcularIngresosTotalesDesdeTotalesCongelados() {
-        // I4: los ingresos suman el total CONGELADO de cada venta, NO recalculan
-        // desde el grupo actual (editar el grupo no debe alterar la recaudación).
-        SolicitudCompra s1 = new SolicitudCompra();
-        s1.setCantidad(2);
-        s1.setPrecioUnitario(1000.0);
-        s1.setTotal(2000.0);
-
-        when(repository.findAll()).thenReturn(Collections.singletonList(s1));
+        // I4: los ingresos suman el total CONGELADO de las ventas ACTIVA, NO recalculan
+        // desde el grupo actual. La suma se delega a la query agregada del repositorio
+        // (SUM en la DB, excluye anuladas); el service no recorre nada en memoria.
+        when(repository.sumarIngresosActivas()).thenReturn(2000.0);
 
         // Act
         Double total = service.calcularIngresosTotales();
 
         // Assert
         assertEquals(2000.0, total);
-        verify(repository).findAll();
+        verify(repository).sumarIngresosActivas();
         verifyNoInteractions(grupoService);
     }
 

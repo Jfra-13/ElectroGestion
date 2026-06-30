@@ -1,5 +1,6 @@
 package com.jfra_13.grupos_electrogenos.model.entity;
 
+import com.jfra_13.grupos_electrogenos.model.enums.EstadoVenta;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoCombustible;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
 import jakarta.persistence.*;
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -82,6 +84,25 @@ public class SolicitudCompra {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vendedor_id")
     private Usuario vendedor;
+
+    // Estado de la venta. ACTIVA cuenta en finanzas; ANULADA es reversa con rastro.
+    // estado + anuladaAt + anuladaPor + motivoAnulacion SON la auditoría de anulación.
+    // DEFAULT a nivel DB ('ACTIVA') para que la DDL generada por Hibernate (dev) quede
+    // consistente con la migración V7 (prod) y los inserts por SQL crudo (seed) que
+    // omiten la columna no fallen. El initializer Java cubre los persist vía JPA.
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @ColumnDefault("'ACTIVA'")
+    private EstadoVenta estado = EstadoVenta.ACTIVA;
+
+    @Column(length = 500)
+    private String motivoAnulacion;     // null hasta anular
+
+    private LocalDateTime anuladaAt;    // null hasta anular
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "anulada_por")
+    private Usuario anuladaPor;         // quién anuló (auditoría)
 
     @CreationTimestamp
     @Column(updatable = false)

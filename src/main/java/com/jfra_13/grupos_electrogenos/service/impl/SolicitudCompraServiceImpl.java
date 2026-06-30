@@ -2,16 +2,20 @@ package com.jfra_13.grupos_electrogenos.service.impl;
 
 import com.jfra_13.grupos_electrogenos.exception.ResourceNotFoundException;
 import com.jfra_13.grupos_electrogenos.exception.StockInsuficienteException;
+import com.jfra_13.grupos_electrogenos.exception.VentaYaAnuladaException;
+import com.jfra_13.grupos_electrogenos.model.dto.AnulacionRequestDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.RankingEntidadDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.RankingVendedorDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.ReportePagoDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraRequestDTO;
+import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraUpdateDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.SolicitudCompraResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.dto.PaginatedResponseDTO;
 import com.jfra_13.grupos_electrogenos.model.entity.Entidad;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.SolicitudCompra;
 import com.jfra_13.grupos_electrogenos.model.entity.Usuario;
+import com.jfra_13.grupos_electrogenos.model.enums.EstadoVenta;
 import com.jfra_13.grupos_electrogenos.model.enums.TipoPago;
 import com.jfra_13.grupos_electrogenos.mapper.SolicitudCompraMapper;
 import com.jfra_13.grupos_electrogenos.repository.EntidadRepository;
@@ -24,6 +28,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -135,34 +140,20 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
 
     @Override
     @Transactional
-    public SolicitudCompraResponseDTO actualizarSolicitud(Long id, SolicitudCompraRequestDTO dto) {
+    public SolicitudCompraResponseDTO actualizarSolicitud(Long id, SolicitudCompraUpdateDTO dto) {
         SolicitudCompra existing = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitud de compra no encontrada"));
-        
-        Entidad entidad = entidadRepository.findById(dto.getEntidadId())
-                .orElseThrow(() -> new ResourceNotFoundException("Entidad no encontrada"));
 
-        // Re-evaluar grupo si cambian potencia requerida o tipo de combustible
-        if (!existing.getTipoCombustible().equals(dto.getTipoCombustible()) || 
-            !existing.getPotenciaRequerida().equals(dto.getPotenciaRequerida())) {
-            
-            List<GrupoElectrogeno> candidatos = grupoRepository.findByTipoCombustibleOrderByPMaxDesc(dto.getTipoCombustible(), Pageable.unpaged()).getContent();
-            GrupoElectrogeno nuevoGrupo = candidatos.stream()
-                .filter(g -> g.getPMax() >= dto.getPotenciaRequerida())
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("No se encontró un Grupo Electrógeno que cumpla con la nueva potencia requerida para este combustible"));
-            
-            existing.setGrupoElectrogeno(nuevoGrupo);
+        // No se edita una venta anulada: está cerrada, es solo rastro.
+        if (existing.getEstado() == EstadoVenta.ANULADA) {
+            throw new VentaYaAnuladaException("No se puede editar una venta anulada.");
         }
 
-        mapper.updateEntity(dto, entidad, existing.getGrupoElectrogeno(), existing);
-
-        // El precio unitario queda CONGELADO desde la creación; solo se recalcula el
-        // total si cambió la cantidad. (Fallback para filas legacy sin precio congelado.)
-        if (existing.getPrecioUnitario() == null) {
-            existing.setPrecioUnitario(grupoService.calcularPrecioVenta(existing.getGrupoElectrogeno()));
-        }
-        existing.setTotal(existing.getPrecioUnitario() * existing.getCantidad());
+        // Edición ACOTADA: solo el nombre del solicitante. tipoPago, cantidad,
+        // potencia, combustible, grupo, entidad, precio y total son inmutables;
+        // tocarlos descuadraría stock y reportes ya emitidos. Para cambiarlos:
+        // anular la venta y registrar una nueva.
+        existing.setNombreSolicitante(dto.getNombreSolicitante());
 
         SolicitudCompra actualizada = repository.save(existing);
         return mapper.toResponse(actualizada);
@@ -170,11 +161,29 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
 
     @Override
     @Transactional
-    public void eliminarSolicitud(Long id) {
-        if (!repository.existsById(id)) {
-            throw new ResourceNotFoundException("Solicitud de compra no encontrada");
+    public SolicitudCompraResponseDTO anularVenta(Long id, AnulacionRequestDTO dto) {
+        SolicitudCompra venta = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitud de compra no encontrada"));
+
+        if (venta.getEstado() == EstadoVenta.ANULADA) {
+            throw new VentaYaAnuladaException("La venta ya estaba anulada.");
         }
-        repository.deleteById(id);
+
+        // Reponer stock: el grupo está gestionado en esta transacción, @Version cubre
+        // concurrencia. El dirty checking persiste el cambio al cerrar la transacción.
+        GrupoElectrogeno grupo = venta.getGrupoElectrogeno();
+        int stockActual = grupo.getStock() != null ? grupo.getStock() : 0;
+        grupo.setStock(stockActual + venta.getCantidad());
+
+        // Marcar anulada con rastro. El precio/total quedan congelados tal cual se
+        // había cobrado: lo que la saca de la caja es el estado, no borrar el número.
+        venta.setEstado(EstadoVenta.ANULADA);
+        venta.setAnuladaAt(LocalDateTime.now());
+        venta.setAnuladaPor(usuarioAutenticado());
+        venta.setMotivoAnulacion(dto.getMotivo());
+
+        SolicitudCompra anulada = repository.save(venta);
+        return mapper.toResponse(anulada);
     }
 
     @Override
@@ -189,10 +198,9 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
 
     @Override
     public Double calcularIngresosTotales() {
-        // I4: se suman los totales CONGELADOS de cada venta; no se recalcula desde el grupo.
-        return repository.findAll().stream()
-                .mapToDouble(venta -> venta.getTotal() != null ? venta.getTotal() : 0.0)
-                .sum();
+        // I4: se suman los totales CONGELADOS de las ventas ACTIVA; las anuladas no
+        // cuentan. Agregado en la DB (SUM) en vez de traer todo a memoria.
+        return repository.sumarIngresosActivas();
     }
 
     @Override
