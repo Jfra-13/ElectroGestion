@@ -1,8 +1,0 @@
-Me piden lo siugiente pero no se si lo tengo o como hacerlo a mano, me tomara mucho necesito que hagas la ingesta, pero tengo ciertos detalles que sucedieron la ultima vez, tu metias todos los datos incluyendo el precio clientes y empleados ? porque no habian esas opciones directamente o bueno no se pmotraban cuando realizaba una venta , quiero saber si ingestaste directamente o usaste funcionalidades del sistema ya que en la demostracion debo hacer eso , debo ver el ranking de ventas del empleado, de cliente top , etc datos.
-
-Figura 15:
- { Captura del panel de administración en ejecución, mostrando los reportes financieros globales y el ranking de clientes/empleados. }
-Figura 16:
- { Captura de la vista del perfil Empleado, evidenciando el filtro que le permite ver y gestionar únicamente sus propias operaciones comerciales. }
-
-asi que en base a eso que te pongo en contexto comentame , por que cuando yo cree un empleado , ingrese una venta no salio en erankin clinetes, ni el rankin de ventas por el empleado a mi empleado nuevo, sin embargo en montos de dinero y stock me parecio que si funcionaban bien. Es algo de back o front. Y al final me dejas de forma breve la pregunta y respuesta corta de tu desicion
