@@ -325,75 +325,115 @@ configurar CORS dinámicamente. Esta variable activa ese mecanismo.
 
 ---
 
-## PARTE 5 — Base de datos (según tu setup)
+## PARTE 5 — Base de datos: Railway Postgres `[10 min]`
 
-### Opción A: H2 in-memory (más simple — recomendada para la expo)
+> ⚠️ **No uses H2 in-memory.** Este backend corre el perfil `prod` con
+> `ddl-auto=validate` + Flyway (migraciones `V1..V6`). H2 vacío no tiene esas
+> tablas → `validate` falla → **la app no arranca**. Necesitás Postgres real.
 
-Si tu backend usa H2 en memoria (probablemente el caso en un proyecto
-universitario), **no necesitás hacer nada adicional**. El backend se levanta
-solo con una base de datos en RAM.
+Railway Postgres vive en el mismo proyecto que el backend, lo pagás con los
+créditos del Student Pack y Railway inyecta las credenciales por referencia
+(no copiás strings a mano).
 
-**Consideraciones para la expo:**
-- Los datos persisten mientras Railway no reinicie el servicio
-- Antes de la expo, entrar al panel de admin y cargar datos de prueba
-- Tener un script SQL o endpoint de seed para pre-cargar datos rápidamente
-- Verificar que el sistema no lleva sin uso muchas horas antes (Railway puede
-  reiniciar el contenedor por mantenimiento)
+### 5.1 Crear la base Postgres `[2 min]`
 
-> ✅ Para una presentación de ~2 horas esto es suficiente y 100% estable.
+1. En tu proyecto Railway → click **"+ New"** (o **"+ Create"**)
+2. Elegir **"Database"** → **"Add PostgreSQL"**
+3. Railway crea un servicio `Postgres` al lado de tu backend
+
+Esto genera automáticamente las variables internas `PGHOST`, `PGPORT`,
+`PGDATABASE`, `PGUSER`, `PGPASSWORD` en el servicio Postgres.
+
+### 5.2 Conectar el backend a la base `[3 min]`
+
+En el servicio del **backend** (no el de Postgres) → tab **"Variables"**.
+Tu app lee `DB_HOST/DB_PORT/...`, así que mapeás las de Railway por
+**referencia** (sintaxis `${{Postgres.VAR}}`):
+
+| Variable (backend) | Valor |
+|---|---|
+| `DB_HOST` | `${{Postgres.PGHOST}}` |
+| `DB_PORT` | `${{Postgres.PGPORT}}` |
+| `DB_NAME` | `${{Postgres.PGDATABASE}}` |
+| `DB_USER` | `${{Postgres.PGUSER}}` |
+| `DB_PASSWORD` | `${{Postgres.PGPASSWORD}}` |
+
+> `PGHOST` apunta al host **interno** de Railway (`postgres.railway.internal`).
+> El tráfico backend↔base es por red privada — más rápido y no consume egress.
+
+### 5.3 Resto de variables obligatorias `[3 min]`
+
+El perfil `prod` hace **fail-fast**: si falta `JWT_SECRET_PROD`,
+`ADMIN_USERNAME` o `ADMIN_PASSWORD`, el backend **no arranca** (a propósito,
+para no quedar con credenciales por default en producción). Agregá:
+
+| Variable | Valor | Notas |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `prod` | Activa `application-prod.properties` |
+| `JWT_SECRET_PROD` | *(string largo y random)* | Mín. 32 chars para HS256. Generá uno, no lo inventes corto |
+| `ADMIN_USERNAME` | `admin` | Usuario del primer admin (bootstrap) |
+| `ADMIN_PASSWORD` | *(tu contraseña)* | Con esto entrás en la expo. **No la compartas si es real** |
+| `ADMIN_EMAIL` | `admin@electrogenos.local` | Opcional, tiene default |
+| `ALLOWED_ORIGINS` | *(URL de Vercel — Parte 4)* | Sin barra final |
+
+> Generar un `JWT_SECRET_PROD` rápido (cualquiera sirve):
+> ```bash
+> openssl rand -base64 48
+> ```
+
+### 5.4 Redeploy `[2 min]`
+
+Al guardar las variables Railway hace **redeploy automático**. En el arranque:
+1. Flyway corre `V1..V6` → crea el esquema en Postgres
+2. Hibernate **valida** que las entidades matcheen (no toca el esquema)
+3. El bootstrap crea el admin con `ADMIN_USERNAME` / `ADMIN_PASSWORD`
+
+> Mirá los **logs** del deploy. Si ves `Flyway ... migrating schema` y después
+> `Started ...Application`, está sano. Si ves `Schema-validation` o
+> `relation does not exist`, la base no migró — revisá que Flyway esté activo.
+
+> ✅ Los datos **persisten** entre reinicios. No hay que recargar nada antes
+> de la expo. Cargá los grupos/ventas una vez y quedan.
 
 ---
 
-### Opción B: Supabase PostgreSQL (datos persistentes)
+### 5.5 Alternativa: si Railway no está disponible (Render / Fly.io)
 
-Si necesitás que los datos sobrevivan reinicios, Supabase da una base de datos
-PostgreSQL gratuita.
+Casi nada del plan cambia. `$PORT`, perfil `prod`, `validate` + Flyway, build
+`mvnw` y **todas las vars** (`JWT_SECRET_PROD`, `ADMIN_USERNAME`,
+`ADMIN_PASSWORD`, `ALLOWED_ORIGINS`, `SPRING_PROFILES_ACTIVE`) son iguales.
 
-#### B.1 Crear proyecto en Supabase `[5 min]`
-
-1. Ir a **[supabase.com](https://supabase.com)** → Sign Up con GitHub
-2. Click **"New Project"** → elegir organización → poner nombre y contraseña
-3. Elegir región: **South America (São Paulo)** — la más cercana a Perú
-4. Esperar que el proyecto se inicialice (~2 min)
-
-#### B.2 Obtener string de conexión `[2 min]`
-
-En tu proyecto Supabase:
-1. Menú izquierdo → **"Project Settings"** → **"Database"**
-2. Sección **"Connection string"** → tab **"URI"**
-3. Copiar el string (tiene el formato):
-   ```
-   postgresql://postgres:[PASSWORD]@db.xxxx.supabase.co:5432/postgres
-   ```
-
-#### B.3 Configurar Spring Boot para PostgreSQL `[10 min]`
-
-**Verificar que el `pom.xml` tenga la dependencia:**
-```xml
-<dependency>
-    <groupId>org.postgresql</groupId>
-    <artifactId>postgresql</artifactId>
-    <scope>runtime</scope>
-</dependency>
+**Lo único que cambia: cómo cableás la base.** Estas plataformas dan un solo
+`DATABASE_URL` en formato URI (no las vars `PGHOST/PGPORT/...` por referencia
+como Railway):
+```
+postgresql://usuario:password@host:5432/basededatos
 ```
 
-Si no está, agregarla y hacer push.
+Dos opciones:
 
-**En Railway, agregar estas variables de entorno:**
+**Opción 1 — cargar las `DB_*` a mano** (desglosar la URI):
+
+| Variable | De la URI sale de... |
+|---|---|
+| `DB_HOST` | el `host` |
+| `DB_PORT` | el puerto (`5432`) |
+| `DB_NAME` | la base después de la última `/` |
+| `DB_USER` | el usuario antes de `:` |
+| `DB_PASSWORD` | el password entre `:` y `@` |
+
+**Opción 2 — usar `SPRING_DATASOURCE_*` directo** (más limpio, cross-platform):
 
 | Variable | Valor |
 |---|---|
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://db.xxxx.supabase.co:5432/postgres` |
-| `SPRING_DATASOURCE_USERNAME` | `postgres` |
-| `SPRING_DATASOURCE_PASSWORD` | tu contraseña de Supabase |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `update` |
-| `SPRING_JPA_DATABASE_PLATFORM` | `org.hibernate.dialect.PostgreSQLDialect` |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://host:5432/basededatos` |
+| `SPRING_DATASOURCE_USERNAME` | `usuario` |
+| `SPRING_DATASOURCE_PASSWORD` | `password` |
 
-> Railway hace redeploy automático. Hibernate va a crear las tablas en Supabase
-> automáticamente con `ddl-auto=update`.
-
-> ⚠️ Si ya tenés `application-prod.properties` con estas configuraciones, solo
-> necesitás poner las variables sensibles (URL, user, password) en Railway.
+> Spring toma estas y **pisan** el datasource del perfil prod (las `DB_*`
+> quedan sin usar). Mismo `validate` + Flyway, **sin tocar código**. Ojo:
+> `SPRING_DATASOURCE_URL` lleva el prefijo `jdbc:` y la URI de la plataforma
+> normalmente **no** lo trae — agregalo.
 
 ---
 
@@ -549,8 +589,17 @@ Pero para mañana, con la URL de Railway está bien.
 
 | Variable | Valor | Cuándo agregarla |
 |---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `prod` | Al configurar el servicio |
+| `DB_HOST` | `${{Postgres.PGHOST}}` | Parte 5 (al crear Postgres) |
+| `DB_PORT` | `${{Postgres.PGPORT}}` | Parte 5 |
+| `DB_NAME` | `${{Postgres.PGDATABASE}}` | Parte 5 |
+| `DB_USER` | `${{Postgres.PGUSER}}` | Parte 5 |
+| `DB_PASSWORD` | `${{Postgres.PGPASSWORD}}` | Parte 5 |
+| `JWT_SECRET_PROD` | *(string random ≥32 chars)* | Parte 5 — **obligatoria** |
+| `ADMIN_USERNAME` | `admin` | Parte 5 — **obligatoria** |
+| `ADMIN_PASSWORD` | *(tu contraseña)* | Parte 5 — **obligatoria** |
+| `ADMIN_EMAIL` | `admin@electrogenos.local` | Parte 5 (opcional) |
 | `ALLOWED_ORIGINS` | `https://tu-front.vercel.app` | Después de obtener URL de Vercel |
-| `SPRING_PROFILES_ACTIVE` | `prod` | Si tenés profile de producción |
 
 ### Vercel (frontend)
 

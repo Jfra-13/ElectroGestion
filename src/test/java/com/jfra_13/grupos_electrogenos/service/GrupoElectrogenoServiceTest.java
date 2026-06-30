@@ -1,5 +1,6 @@
 package com.jfra_13.grupos_electrogenos.service;
 
+import com.jfra_13.grupos_electrogenos.exception.ResourceInUseException;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogeno;
 import com.jfra_13.grupos_electrogenos.model.entity.GrupoElectrogenoMovil;
 import com.jfra_13.grupos_electrogenos.model.enums.MaterialEje;
@@ -7,6 +8,7 @@ import com.jfra_13.grupos_electrogenos.model.enums.TipoArranque;
 import com.jfra_13.grupos_electrogenos.mapper.GrupoElectrogenoMapper;
 import com.jfra_13.grupos_electrogenos.repository.GrupoElectrogenoRepository;
 import com.jfra_13.grupos_electrogenos.service.impl.GrupoElectrogenoServiceImpl;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,8 @@ import org.mapstruct.factory.Mappers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class GrupoElectrogenoServiceTest {
@@ -84,6 +88,20 @@ class GrupoElectrogenoServiceTest {
         assertThatThrownBy(() -> service.calcularPrecioVenta(incompleto))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Faltan datos básicos para calcular el precio.");
+    }
+
+    @Test
+    @DisplayName("Eliminar un grupo con ventas asociadas (FK) debe traducirse a ResourceInUseException")
+    void testEliminarGrupoConVentasLanzaResourceInUse() {
+        Long id = 1L;
+        when(repository.existsById(id)).thenReturn(true);
+        // La violación de FK la levanta el flush; el service debe traducirla a 409 de negocio.
+        doThrow(new DataIntegrityViolationException("FK violation"))
+                .when(repository).flush();
+
+        assertThatThrownBy(() -> service.eliminarGrupo(id))
+                .isInstanceOf(ResourceInUseException.class)
+                .hasMessageContaining("ventas registradas");
     }
 
     @Test

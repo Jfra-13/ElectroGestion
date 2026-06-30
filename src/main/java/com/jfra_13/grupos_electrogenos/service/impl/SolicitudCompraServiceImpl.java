@@ -61,12 +61,20 @@ public class SolicitudCompraServiceImpl implements SolicitudCompraService {
         Entidad entidad = entidadRepository.findById(dto.getEntidadId())
                 .orElseThrow(() -> new ResourceNotFoundException("Entidad no encontrada"));
 
-        List<GrupoElectrogeno> candidatos = grupoRepository.findByTipoCombustibleOrderByPMaxDesc(dto.getTipoCombustible(), Pageable.unpaged()).getContent();
-
-        GrupoElectrogeno grupoSeleccionado = candidatos.stream()
-                .filter(g -> g.getPMax() >= dto.getPotenciaRequerida())
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("No se encontró un Grupo Electrógeno que cumpla con la potencia requerida para este combustible"));
+        GrupoElectrogeno grupoSeleccionado;
+        if (dto.getGrupoCodigo() != null && !dto.getGrupoCodigo().isBlank()) {
+            // Venta por grupo elegido: el grupo ya está decidido, NO se corre la
+            // tasación. Se vende ese código exacto, con su stock y su precio.
+            grupoSeleccionado = grupoRepository.findByCodigo(dto.getGrupoCodigo())
+                    .orElseThrow(() -> new ResourceNotFoundException("Grupo no encontrado: " + dto.getGrupoCodigo()));
+        } else {
+            // Sin grupoCodigo: tasación actual (elige el grupo que cumple los criterios).
+            List<GrupoElectrogeno> candidatos = grupoRepository.findByTipoCombustibleOrderByPMaxDesc(dto.getTipoCombustible(), Pageable.unpaged()).getContent();
+            grupoSeleccionado = candidatos.stream()
+                    .filter(g -> g.getPMax() >= dto.getPotenciaRequerida())
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("No se encontró un Grupo Electrógeno que cumpla con la potencia requerida para este combustible"));
+        }
 
         // I5: validar disponibilidad y descontar stock (rechaza si no alcanza).
         // El grupo está gestionado en esta transacción; @Version evita lost updates concurrentes.

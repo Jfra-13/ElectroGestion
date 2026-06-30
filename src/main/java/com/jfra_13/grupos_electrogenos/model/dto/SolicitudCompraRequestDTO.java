@@ -33,4 +33,8 @@ public class SolicitudCompraRequestDTO {
 
     @NotNull(message = "El ID de la entidad es obligatorio")
     private Long entidadId;
+
+    // Opcional. Si viene, la venta es por este grupo exacto (sin tasación):
+    // se valida su stock y se congela su precio. Si no viene, se corre la tasación.
+    private String grupoCodigo;
 }
