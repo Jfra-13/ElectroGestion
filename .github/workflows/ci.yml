@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -15,3 +19,18 @@ jobs:
           java-version: '21'
           cache: maven
       - run: ./mvnw --batch-mode verify
+
+      - name: Test report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Tests
+          path: '**/target/surefire-reports/*.xml'
+          reporter: java-junit
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
